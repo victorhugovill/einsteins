@@ -162,9 +162,9 @@ const calcularPosicaoSeta = (vidas: number, vidasOrdemExibicao: number[]): { ein
   return { einsteinIndex: einsteinAleatorio, arrowPosition };
 };
 
-const TituloAnimado = memo(({ tituloAnimando }) => {
+const TituloAnimado = memo(({ tituloAnimando }:any) => {
   const letras = "EINSTEINS".split("");
-  if (tituloAnimando) {
+  if (tituloAnimando) { 
     return (
       <h1 
        key="animating" 
@@ -246,9 +246,9 @@ const defaultTransitionState = memo(() => ({
   opacity: 1,
   transitionDelay: 0,
   transitionDuration: 400
-}), []);
+}as any), [] as any );
 
-const animationsEinstein = memo(() => ['bounce', 'spin', 'heartbeat', 'swing',  'shake',   'jello', 'rubber', 'tada', 'slide-out', 'wiggle', 'pulse', 'flip'], []);
+const animationsEinstein = memo(() => ['bounce', 'spin', 'heartbeat', 'swing',  'shake',   'jello', 'rubber', 'tada', 'slide-out', 'wiggle', 'pulse', 'flip'], [] as any );
 
 const [ordemOriginalEinsteins, setOrdemOriginalEinsteins] = useState<number[] | null>(null);
 
@@ -256,8 +256,8 @@ const [ordemOriginalEinsteins, setOrdemOriginalEinsteins] = useState<number[] | 
     console.log("Estado de tituloAnimando mudou para:", tituloAnimando);
   }, [tituloAnimando]);
 
- const calcularRanking = (erros) => {
-    const rankings = {
+ const calcularRanking = (erros:any) => {
+    const rankings:any = {
       0: {
         titulo: "GENIAL",
         subtitulo: "(0 ERROS)",
@@ -407,7 +407,7 @@ useEffect(() => {
 }, [balaoAtivo]); 
 
 useEffect(() => {
-  const handleGlobalClick = (event) => {
+  const handleGlobalClick = (event:any) => {
     // Verifica se há um balão ativo
     if (balaoAtivo) {
       // Opcional: Verificar se o clique NÃO foi no próprio balão
@@ -448,7 +448,7 @@ const showBubble = useCallback((frase: string, indexEinstein: number | null, arr
             arrowLeft: finalArrowLeft,
             bubbleLeft: finalBubbleLeft,
             bubbleRight: null,
-        });
+        } as any);
       
     };
 
@@ -700,15 +700,6 @@ useEffect(() => {
 }, [vidas]);
 
 useEffect(() => {
-  console.log('🎨 Estado atual dos acertos:', acertos.map(a => ({
-    name: a.name,
-    color: a.color,
-    backgroundColor: a.backgroundColor,
-    reveladoNoFinal: a.reveladoNoFinal
-  })));
-}, [acertos]);
-
-useEffect(() => {
   // Se não houver grupos na fila para revelar, não faz nada
   if (gruposARevelar.length === 0) {
     return;
@@ -910,7 +901,7 @@ const reiniciarJogo = useCallback(() => {
 }, []); // Dependências vazias, é uma função autocontida
 
 // Função para salvar o nome do vencedor e reiniciar o jogo
-const handleSalvarVencedor = (e) => {
+const handleSalvarVencedor = (e:any) => {
   e.preventDefault();
   if (nomeAtual.trim()) {
     const errosRealizados = 4 - vidas;
@@ -974,7 +965,7 @@ useEffect(() => {
             transitionDuration: 1000,
             transitionDelay: 0,
             transitionProperty: 'opacity, transform'
-          };
+          } as any;
         });
         return newStates;
       });
@@ -997,7 +988,7 @@ useEffect(() => {
               transitionDuration: 1200,
               transitionDelay: 0,
               transitionProperty: 'opacity, transform'
-           };
+           } as any;
           });
           return newStates;
         });
@@ -1348,7 +1339,7 @@ if (einsteinWinChance) {
 
   // Função para criar letras se não existirem
   const criarLetrasSeNecessario = () => {
-    const titulo = document.querySelector('.einsteins-title');
+    const titulo: any = document.querySelector('.einsteins-title');
     if (!titulo) {
       console.error('Título não encontrado');
       return null;
@@ -1361,7 +1352,7 @@ if (einsteinWinChance) {
     }
 
     // Criar estrutura de letras
-    titulo.innerHTML = texto.split('').map((char, index) => 
+    titulo.innerHTML = texto.split('').map((char:any) => 
       `<span class="letter" style="display: inline-block; transform-origin: center bottom;">${char}</span>`
     ).join('');
     
@@ -2040,7 +2031,7 @@ import { AnimatePresence } from 'framer-motion';
             transition: 'min-height 0.8s ease-out'
           }}
         >
- {acertos.map((g, i) => {
+ {acertos.map((g:any, i) => {
   const cores = [
     'bg-sky-200 border-sky-400',
     'bg-amber-200 border-amber-400', 
@@ -2082,7 +2073,7 @@ import { AnimatePresence } from 'framer-motion';
         {g.name.toUpperCase()}
       </strong>
       <span className="text-xs sm:text-sm">
-        {g.words.map(w => w.toUpperCase()).join(', ')}
+        {g.words.map((w:any)=> w.toUpperCase()).join(', ')}
       </span>
     </motion.div>
   );
@@ -2178,7 +2169,7 @@ const state = palavraTransitionStates[palavra] || defaultTransitionState;
         <motion.div
           key={originalIndex} 
           layoutId={`einstein-${originalIndex}`}
-          ref={el => einsteinRefs.current[originalIndex] = el}
+          ref={(el:any) => einsteinRefs.current[originalIndex] = el}
           className={`relative flex justify-center items-center w-16 h-16 sm:w-24 sm:h-24
             einstein-clickable
             ${einsteinAnimations[originalIndex] ? `einstein-${einsteinAnimations[originalIndex]}` : ''}
@@ -2480,7 +2471,5 @@ const state = palavraTransitionStates[palavra] || defaultTransitionState;
     </motion.div>
   )}
 </AnimatePresence>
-{/* =================================================================== */}
-
     </>
-  )
+  )  }
