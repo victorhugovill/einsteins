@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image';
 
 // ========== DADOS DO JOGO ==========
 const Grupos = [
@@ -18,7 +19,7 @@ function shuffleArray<T>(array: T[]): T[] {
   const arr = [...array]
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1))
-    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
   }
   return arr
 }
@@ -43,24 +44,22 @@ const frasesErro = [
   "Errar faz parte, mas também não precisa exagerar!",
   "Parece que o óbvio não é assim tão óbvio para todo mundo.",
   "Perfeito! Mais um exemplo de como não se faz. Anotou?",
-  "É mais fácil tentar entender a teoria da relatividade do que esse seu raciocínio de agora.",
   "Ah, a mente humana... Cheia de limitações, não é mesmo?",
-  "Achava que o óbvio dispensava explicações, mas parece que eu estava enganado.",
+  "Sempre achei que o óbvio dispensava explicações...",
   "Impressionante. Não no bom sentido, claro.",
   "Errar é humano. Mas essa foi de outro planeta.",
-  "Talvez tenha sido um erro... ou uma arte conceitual. Difícil dizer.",
-  "É bom errar de vez em quando. Assim você valoriza quando acerta.",
-  "Você está quase lá! Só precisa ir na direção oposta dessa última jogada.",
-  "Essa tentativa foi... diferente. Diferente de \"certo\", por exemplo.",
-  "A complexidade desta tarefa é diretamente proporcional ao seu desempenho."
+  "Talvez um erro... ou uma arte conceitual. Difícil dizer.",
+  "Errar faz bem. Assim você valoriza quando acerta.",
+  "Quase lá! Só precisa ir na direção oposta dessa última jogada.",
+  "Essa tentativa foi diferente. Diferente de \"certo\", por exemplo.",
 ];
 
 const frasesQuaseAcerto = [
   "Quase lá! Só uma escapou...",
-  "Você está no caminho certo!",
-  "Foi por pouco. Repare bem nas palavras.",
+  "Você está no caminho certo! Três palavras corretas...",
+  "Foi por pouco, uma só está errada. Repare bem nas palavras.",
   "Você enxergou o padrão — só uma peça está fora do lugar.",
-  "Quase lá! Um pouco mais de atenção e você acerta tudo...",
+  "Um pouco mais de atenção e você acerta tudo...",
   "Está chegando perto. Não desista agora!",
   "Continue nesse caminho! A resposta está bem na sua frente."
 ];
@@ -85,14 +84,13 @@ const frasesMotivacionais = [
 const frasesEmbaralhar = [
   "Um novo olhar é um ótima maneira de encontrar a resposta!",
   "Isso está começando a ficar um pouco preocupante.",
-  "Embaralhar é o primeiro passo para fingir que você sabe o que está fazendo.",
   "Eu já estou começando a ficar tonto!"
 ];
 
 const frasesFimDeJogo = [
   "Você fracassou gloriosamente. Nos vemos no próximo enigma.",
-  "A derrota é também uma forma de aprendizado. Não pare de tentar!",
-  "Seu esforço hoje prepara as vitórias de amanhã. Não desista!",
+  "A derrota é também uma forma de aprendizado. Jamais pare de tentar!",
+  "Seu esforço hoje prepara as vitórias de amanhã. Não para de tentar!",
   "Lembre-se que a jornada vale mais do que o resultado. Até breve.",
   "A persintência é o que transforma sonhos em conquistas.",
   "Seu esforço vale ouro. Continue tentando, o sucesso está próximo!",
@@ -114,35 +112,29 @@ const fraseDeEmbaralharPorCount = new Map<number, string>([
   [20, frasesEmbaralhar[3]],
 ]);
 
-// 1. PRIMEIRO: Adicione esta função auxiliar logo após as constantes de animação (linha ~87)
-// Coloque esta função depois da linha: const fraseDeEmbaralharPorCount = new Map<number, string>([...
-
 const calcularPosicaoSeta = (vidas: number, vidasOrdemExibicao: number[]): { einsteinIndex: number, arrowPosition: string } => {
-  // Filtra apenas os Einsteins visíveis (que ainda têm vida)
   const einsteinVisiveis = vidasOrdemExibicao.filter(originalIndex => originalIndex < vidas);
-  
+
   if (einsteinVisiveis.length === 0) {
     return { einsteinIndex: 0, arrowPosition: '50%' }; // Fallback
   }
-  
+
   // Escolhe um Einstein aleatório entre os visíveis
   const einsteinAleatorio = einsteinVisiveis[Math.floor(Math.random() * einsteinVisiveis.length)];
-  
-  // Calcula a posição da seta baseada na posição do Einstein escolhido
-  // As posições são baseadas no layout atual do grid de Einsteins
+
   const posicoes = {
     0: '20%',   // Primeiro Einstein (mais à esquerda)
     1: '41%',   // Segundo Einstein  
     2: '59%',   // Terceiro Einstein
     3: '85%'    // Quarto Einstein (mais à direita)
   };
-  
+
   // Encontra a posição do Einstein escolhido no array visível
   const posicaoNoGrid = einsteinVisiveis.indexOf(einsteinAleatorio);
-  
+
   // Ajusta a posição baseada no número de Einsteins visíveis
   let arrowPosition: string;
-  
+
   switch (einsteinVisiveis.length) {
     case 1:
       arrowPosition = '50%'; // Centralizado se só há 1
@@ -158,39 +150,251 @@ const calcularPosicaoSeta = (vidas: number, vidasOrdemExibicao: number[]): { ein
       arrowPosition = posicoes[einsteinAleatorio as keyof typeof posicoes] || '50%';
       break;
   }
-  
+
   return { einsteinIndex: einsteinAleatorio, arrowPosition };
 };
 
-const TituloAnimado = memo(({ tituloAnimando }:any) => {
+const TituloAnimado = memo(({ tituloAnimando }: any) => {
   const letras = "EINSTEINS".split("");
-  if (tituloAnimando) { 
+
+  if (tituloAnimando) {
     return (
-      <h1 
-       key="animating" 
-       className="font-bold tracking-widest select-none einsteins-title title-wave-animation">
+      <h1
+        key="animating"
+        className="font-bold tracking-widest select-none einsteins-title title-wave-animation"
+      >
         {letras.map((letra, index) => (
-          <span key={index} className="letter">{letra}</span>
+          <span
+            key={index}
+            className="letter inline-block transition-transform duration-200 ease-in-out hover:scale-[1.2]"
+          >
+            {letra}
+          </span>
         ))}
       </h1>
     );
   }
+
+  // Caso sem animação
   return (
     <h1 className="font-bold tracking-widest select-none einsteins-title">
       EINSTEINS
     </h1>
   );
 });
+TituloAnimado.displayName = 'TituloAnimadoComponente'
+
+const CaixaColaborador = ({ onClose }: any) => {
+  const [ideia, setIdeia] = useState('');
+  const [contato, setContato] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setStatus('submitting');
+
+    try {
+      const response = await fetch('https://formspree.io/f/mkgbzrob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ideia, contato }),
+      });
+
+      if (response.ok) {
+        setStatus('success');
+        setTimeout(() => onClose(), 3000);
+      } else {
+        throw new Error('Falha no envio');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar ideia:', error);
+      setStatus('error');
+    }
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-white/55 p-4"
+      initial={{ scale: 1 }}
+      animate={{ scale: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="relative bg-white p-6 shadow-2xl text-center w-full max-w-sm overflow-hidden"
+        initial={{ scale: 0.1, y: 60, rotateZ: -4 }}
+        animate={{ scale: 1, y: 0, rotateZ: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          duration: 0.8,
+          ease: "easeOut"
+        }}
+        style={{
+          willChange: 'transform, opacity',
+          backfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
+        }}
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-3">Torne‑se um colaborador</h2>
+
+        <p className="text-gray-700 text-s mb-3">
+          Envie ideias de grupos ou palavras para os novos enigmas.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <textarea
+            className="w-full border border-gray-400 p-3 mb-4 h-32 resize-none"
+            placeholder="Escreva aqui suas ideias..."
+            value={ideia}
+            onChange={(e) => setIdeia(e.target.value)}
+            required
+          />
+          <input
+            type="text"
+            className="w-full border border-gray-400 p-3 mb-4"
+            placeholder="E‑mail ou telefone (opcional)"
+            value={contato}
+            onChange={(e) => setContato(e.target.value)}
+          />
+
+          <motion.button
+            type="submit"
+            disabled={status === 'submitting' || !ideia}
+            className="w-full bg-gray-900 text-white px-6 py-3 font-bold transition-all duration-300 disabled:opacity-80"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {status === 'submitting' ? 'Enviando...' : 'ENVIAR IDEIA'}
+          </motion.button>
+        </form>
+
+        {status === 'error' && <p className="text-red-500 mt-3">Erro no envio. Por favor, tente novamente.</p>}
+        {status === 'success' && <p className="text-emerald-700 mt-3"> Sua ideia foi enviada com sucesso! </p>}
+
+        <motion.button
+          onClick={onClose}
+          className="mt-4 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Agora não
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+const CaixaNotificacaoEmail = ({ onClose }: any) => {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+  const handleSubmit = async (e: any) => {
+    e.preventDefault();
+    setStatus('submitting');
+
+    try {
+      const response = await fetch('https://formspree.io/f/mkgbzrob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      if (response.ok) {
+        setStatus('success');
+        setTimeout(() => onClose(), 3000);
+      } else {
+        throw new Error('Falha no envio');
+      }
+    } catch (error) {
+      console.error('Erro ao enviar email:', error);
+      setStatus('error');
+    }
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-white/55 p-4"
+      initial={{ scale: 1 }}
+      animate={{ scale: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="relative bg-white p-6 shadow-2xl text-center w-full max-w-sm overflow-hidden"
+        initial={{ scale: 0.1, y: 60, rotateZ: -4 }}
+        animate={{ scale: 1, y: 0, rotateZ: 0 }}
+        exit={{ opacity: 0 }}
+        transition={{
+          duration: 0.8,
+          ease: "easeOut"
+        }}
+        style={{
+          willChange: 'transform, opacity',
+          backfaceVisibility: 'hidden',
+          transformStyle: 'preserve-3d'
+        }}
+      >
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">Não fique de fora!</h2>
+        <p className="text-gray-700 text-sm mb-6">
+          Deixe seu e-mail para ser avisado quando novos enigmas forem lançados.
+        </p>
+
+        <form onSubmit={handleSubmit}>
+          <input
+            type="email"
+            className="w-full border border-gray-400 p-3 mb-4"
+            placeholder="Seu e-mail"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={status === 'submitting'}
+          />
+
+          <motion.button
+            type="submit"
+            disabled={status === 'submitting' || !email}
+            className="w-full bg-gray-800 text-white px-6 py-3 font-bold transition-all duration-300 disabled:opacity-60"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            {status === 'submitting' ? 'Enviando...' : 'QUERO FICAR POR DENTRO!'}
+          </motion.button>
+        </form>
+
+        {status === 'error' && (
+          <p className="text-red-500 mt-3">Erro no envio. Tente novamente.</p>
+        )}
+        {status === 'success' && (
+          <p className="text-emerald-500 mt-3">Obrigado! Você será notificado!</p>
+        )}
+
+        <motion.button
+          onClick={onClose}
+          className="mt-4 text-sm text-gray-500 hover:text-gray-800 transition-colors"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          Agora não
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 export default function Home() {
- const [selecionadas, setSelecionadas] = useState<string[]>([])
-const [acertos, setAcertos] = useState<Array<{name: string, words: string[]}>>([])
+
+  const [mostrarBotaoFiquePorDentro, setMostrarBotaoFiquePorDentro] = useState(false);
+
+  const [mostrarCaixaColaborador, setMostrarCaixaColaborador] = useState(false);
+
+  const [mostrarMenuInicial, setMostrarMenuInicial] = useState(true);
+  const [mostrarComoJogar, setMostrarComoJogar] = useState(false);
+
+  const [selecionadas, setSelecionadas] = useState<string[]>([])
+  const [acertos, setAcertos] = useState<Array<{ name: string, words: string[] }>>([])
   const [vidas, setVidas] = useState(4)
   const [palavrasExibidas, setPalavrasExibidas] = useState<string[]>([])
-  const [vidasVisiveis, setVidasVisiveis] = useState([true, true, true, true])
   const [embaralhando, setEmbaralhando] = useState(false)
-  const [palavrasAcertoFadeOut, setPalavrasEmFadeOut] = useState<string[]>([]) // Usado para marcar palavras que estão desaparecendo após acerto
-  const [grupoAcertoSurgindo, setGrupoSurgindo] = useState<string | null>(null); // Controla a animação do grupo de acerto surgindo
   const [vidasOrdemExibição, setEinsteinOrder] = useState([0, 1, 2, 3]); // Controla a ordem de exibição dos "Einsteins" (vidas)
 
   const [palavrasAtivas, setPalavrasAtivas] = useState<string[]>([]);  // Palavras atualmente no jogo (não acertadas)
@@ -198,273 +402,235 @@ const [acertos, setAcertos] = useState<Array<{name: string, words: string[]}>>([
 
   const [balaoAtivo, setBalaoAtivo] = useState<{ frase: string; indexEinstein: number | null; arrowLeft: string | null } | null>(null);
   const [isBubbleFadingOut, setIsBubbleFadingOut] = useState(false);
-
   const onBubbleFullyDisappearedCallbackRef = useRef<(() => void) | null>(null);
 
   const gameOverProcessedRef = useRef(false);
+
+  const [mostrarBotoes, setMostrarBotoes] = useState(true);
 
   const [frasesErroDisponiveis, setFrasesErroDisponiveis] = useState<string[]>([]);
   const [tremorBotoesErro, setErroAtivo] = useState(false); // Controla a animação de tremor nos botões de palavra
   const [processandoErro, setProcessandoErro] = useState(false); // Bloqueia ações enquanto um erro ou acerto está sendo processado
 
+  const [jogoFinalizado, setJogoFinalizado] = useState(false);
+  const [modoVisualFinal, setModoVisualFinal] = useState(false);
+
   const [einsteinAnimations, setEinsteinAnimations] = useState<Record<number, string>>({});
-const [einsteinClickCooldowns, setEinsteinClickCooldowns] = useState<Record<number, boolean>>({});
+  const [einsteinClickCooldowns, setEinsteinClickCooldowns] = useState<Record<number, boolean>>({});
   const einsteinRefs = useRef<(HTMLDivElement | null)[]>([]);
   const einsteinContainerRef = useRef<HTMLDivElement | null>(null);
-  const risadaAudioRef = useRef<HTMLAudioElement | null>(null);
-  const buzinaAudioRef = useRef<HTMLAudioElement | null>(null);
   const [mostrarMensagemMotivacao, setMostrarMensagemMotivacao] = useState(false);
   const [mensagemMotivacionalAtual, setMensagemMotivacionalAtual] = useState('');
   const [gridVisivel, setGridVisivel] = useState(true);
   const [gridTransitionClass, setGridTransitionClass] = useState('');
   const [MotivacaoTransition, setMessageTransitionClass] = useState('');
-const mainContainerRef = useRef<HTMLDivElement>(null); 
-const bubbleRef = useRef<HTMLDivElement>(null); 
-const [bubbleWidth, setBubbleWidth] = useState(0);
-const [frasesQuaseAcertoDisponiveis, setFrasesQuaseAcertoDisponiveis] = useState<string[]>([]);
-const [gruposARevelar, setGruposARevelar] = useState<Array<{name: string, words: string[], reveladoNoFinal?: boolean}>>([]);
-const [acertosOriginais, setAcertosOriginais] = useState<Array<{name: string, words: string[]}>>([]);
-  const [shufflePressCount, setShufflePressCount] = useState(0); 
-if (process.env.NODE_ENV !== 'production') {
-  console.log("-> COMPONENTE CARREGADO/RENDERIZADO: shufflePressCount inicial:", shufflePressCount);
-}
-const [palavrasComAnimacaoSalto, setPalavrasComAnimacaoSalto] = useState<string[]>([]);
-const [mostrarEpílogo, setMostrarEpílogo] = useState(false);
-const [fraseFinal, setFraseFinal] = useState<string | null>(null);
-const [epilogoEncerrado, setEpilogoEncerrado] = useState(false);
+  const mainContainerRef = useRef<HTMLDivElement>(null);
+  const bubbleRef = useRef<HTMLDivElement>(null);
+  const [frasesQuaseAcertoDisponiveis, setFrasesQuaseAcertoDisponiveis] = useState<string[]>([]);
+  const [gruposARevelar, setGruposARevelar] = useState<Array<{ name: string, words: string[], reveladoNoFinal?: boolean }>>([]);
+  const [acertosOriginais, setAcertosOriginais] = useState<Array<{ name: string, words: string[] }>>([]);
+  const [shufflePressCount, setShufflePressCount] = useState(0);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log("-> COMPONENTE CARREGADO/RENDERIZADO: shufflePressCount inicial:", shufflePressCount);
+  }
+  const [palavrasComAnimacaoSalto, setPalavrasComAnimacaoSalto] = useState<string[]>([]);
+  const [fraseFinal, setFraseFinal] = useState<string | null>(null);
+  const [epilogoEncerrado, setEpilogoEncerrado] = useState(false);
 
-const [tituloAnimando, setTituloAnimando] = useState(false);
+  const [tituloAnimando, setTituloAnimando] = useState(false);
 
-const [tituloTapCount, setTituloTapCount] = useState(0);
+  // Estados para o Quadro de Vencedores
+  const [vencedores, setVencedores] = useState<{ nome: string; data: string }[]>([]);
+  const [mostrarInputNome, setMostrarInputNome] = useState(false);
+  const [nomeAtual, setNomeAtual] = useState('');
+  const [mostrarCaixaEmail, setMostrarCaixaEmail] = useState(false);
 
-// Estados para o Quadro de Vencedores
-const [vencedores, setVencedores] = useState<{ nome: string; data: string }[]>([]);
-const [mostrarInputNome, setMostrarInputNome] = useState(false);
-const [nomeAtual, setNomeAtual] = useState('');
+  const defaultTransitionState = memo(() => ({
+    opacity: 1,
+    transitionDelay: 0,
+    transitionDuration: 400
+  } as any), [] as any);
+defaultTransitionState.displayName='DefaultTransitionStateComponent'
 
-const defaultTransitionState = memo(() => ({
-  opacity: 1,
-  transitionDelay: 0,
-  transitionDuration: 400
-}as any), [] as any );
-
-const animationsEinstein = memo(() => ['bounce', 'spin', 'heartbeat', 'swing',  'shake',   'jello', 'rubber', 'tada', 'slide-out', 'wiggle', 'pulse', 'flip'], [] as any );
-
-const [ordemOriginalEinsteins, setOrdemOriginalEinsteins] = useState<number[] | null>(null);
+  const [ordemOriginalEinsteins, setOrdemOriginalEinsteins] = useState<number[] | null>(null);
 
   useEffect(() => {
     console.log("Estado de tituloAnimando mudou para:", tituloAnimando);
   }, [tituloAnimando]);
 
- const calcularRanking = (erros:any) => {
-    const rankings:any = {
+  const calcularRanking = (erros: any) => {
+    const rankings: any = {
       0: {
         titulo: "GENIAL",
         subtitulo: "(0 ERROS)",
-        descricao: "Com uma mente à frente do seu tempo, você desvendou o enigma sem cometer um único erro. Uma performance verdadeiramente admirável!",
-        cor: "text-yellow-600",
+        descricao: "Com uma mente à frente do seu tempo, você desvendou o enigma sem cometer um único erro. Uma performance digna de um verdadeiro gênio!",
+        cor: "text-amber-500",
+        corBarra: "bg-amber-400",
         bgCor: "bg-whitw-50",
         borderCor: "border-gray-200"
       },
       1: {
-        titulo: "ADMIRÁVEL", 
+        titulo: "ADMIRÁVEL",
         subtitulo: "(1 ERRO)",
-        descricao: "Um pequeno lapso de memória, mas seu conhecimento é inquestionável! Com apenas um erro, para mostrar que é humano, você juntou as pistas e resolveu o desafio com maestria.",
-        cor: "text-blue-400",
-        bgCor: "bg-white-50", 
+        descricao: "Com apenas um erro, para mostrar que é humano, você analisou cada uma das pistas e resolveu o desafio com pura maestria. Uma conquista e tanto!",
+        cor: "text-sky-300",
+        corBarra: "bg-sky-300",
+        bgCor: "bg-white-50",
         borderCor: "border-gray-200"
       },
       2: {
         titulo: "PERSPICAZ",
-        subtitulo: "(2 ERROS)", 
-        descricao: "Seus erros não foram tropeços, mas valiosos aprendizados! Com inigualável perspicácia, você analisou os resultados, superou os desafios e desvendou o enigma final com destreza.",
-        cor: "text-green-400", 
+        subtitulo: "(2 ERROS)",
+        descricao: "Seus erros não foram tropeços, mas valiosos aprendizados! Com inigualável perspicácia, você superou os desafios e desvendou o enigma final com destreza.",
+        cor: "text-emerald-400",
+        corBarra: "bg-emerald-400",
         bgCor: "bg-white-50",
         borderCor: "border-gray-200"
       },
       3: {
-        titulo: "DESTEMIDO",
+        titulo: "INABALÁVEL",
         subtitulo: "(3 ERROS)",
-        descricao: "Você ousou explorar todas as possibilidades sem medo de errar. Mesmo que isso tenha custado algumas tentativas, sua curiosidade e determinação foram recompensadas. A vitória é sua.",
-        cor: "text-purple-400", 
+        descricao: "Você ousou explorar todas as possibilidades sem medo de errar. Mesmo que isso tenha te custado algumas tentivas, sua ousadia foi recompensada. A vitória é sua.",
+        cor: "text-purple-400",
+        corBarra: "bg-purple-400",
         bgCor: "bg-white-50",
         borderCor: "border-gray-200"
       }
     };
-    
+
     return rankings[erros] || rankings[3]; // Se tiver mais de 3 erros, usa o último
   };
 
-  const cheatResetTimer = useRef(null);
+  const animarTitulo = useCallback(() => {
+    console.log("animarTitulo chamada!");
+    setTituloAnimando(true);
+    setTimeout(() => {
+      setTituloAnimando(false);
+      console.log("tituloAnimando setado para false após timeout.");
+    }, 3000);
+  }, []);
 
+  const [mostrarEinsteinFinal, setMostrarEinsteinFinal] = useState(false);
+  const [mostrarBalaoFinal, setMostrarBalaoFinal] = useState(false);
 
- const animarTitulo = useCallback(() => {
-      console.log("animarTitulo chamada!");
-  setTituloAnimando(true);
-  setTimeout(() => {
-    setTituloAnimando(false);
-    console.log("tituloAnimando setado para false após timeout.");
-  }, 3000); 
-}, []);
-
-const [mostrarEinsteinFinal, setMostrarEinsteinFinal] = useState(false);
-const [mostrarBalaoFinal, setMostrarBalaoFinal] = useState(false);
-
-useEffect(() => {
+  useEffect(() => {
     // Função de inicialização otimizada
     const initializeGame = () => {
-        // Inicialização das frases de erro (memoizada)
-        const shuffledErrorPhrases = shuffleArray([...frasesErro]);
-        setFrasesErroDisponiveis(shuffledErrorPhrases);
+      // Inicialização das frases de erro (memoizada)
+      const shuffledErrorPhrases = shuffleArray([...frasesErro]);
+      setFrasesErroDisponiveis(shuffledErrorPhrases);
 
-        // Inicialização otimizada das palavras
-        const shuffledInitialWords = shuffleArray([...todasPalavrasDoJogo]);
-        
-        // Batch de estados relacionados às palavras
-        setPalavrasAtivas(todasPalavrasDoJogo);
-        setPalavrasExibidas(shuffledInitialWords);
+      // Inicialização otimizada das palavras
+      const shuffledInitialWords = shuffleArray([...todasPalavrasDoJogo]);
 
-        // Estados de transição otimizados com reduce
-        const initialTransitionStates = shuffledInitialWords.reduce((acc, palavra) => {
-            acc[palavra] = { 
-                opacity: 1, 
-                transitionDelay: 0, 
-                transitionDuration: 800 
-            };
-            return acc;
-        }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
-        
-        setPalavraTransitionStates(initialTransitionStates);
+      // Batch de estados relacionados às palavras
+      setPalavrasAtivas(todasPalavrasDoJogo);
+      setPalavrasExibidas(shuffledInitialWords);
+
+      // Estados de transição otimizados com reduce
+      const initialTransitionStates = shuffledInitialWords.reduce((acc, palavra) => {
+        acc[palavra] = {
+          opacity: 1,
+          transitionDelay: 0,
+          transitionDuration: 800
+        };
+        return acc;
+      }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
+
+      setPalavraTransitionStates(initialTransitionStates);
     };
 
     // Inicialização das refs otimizada
     const initializeRefs = () => {
-        einsteinRefs.current = Array(4).fill(null);
-    };
-
-
-    // Inicialização do áudio com error handling melhorado
-    const initializeAudio = () => {
-        if (typeof Audio === 'undefined') return;
-
-        try {
-            const audioConfigs = [
-                { ref: risadaAudioRef, src: '/risada.mp3', volume: 0.8 },
-                { ref: buzinaAudioRef, src: '/buzina.mp3', volume: 0.6 }
-            ];
-
-            audioConfigs.forEach(({ ref, src, volume }) => {
-                const audio = new Audio(src);
-                audio.preload = 'auto';
-                audio.volume = volume;
-                
-                // Error handling para áudio
-                audio.addEventListener('error', (e) => {
-                    console.warn(`Erro ao carregar áudio ${src}:`, e);
-                });
-                
-                ref.current = audio;
-            });
-        } catch (error) {
-            console.warn('Erro na inicialização do áudio:', error);
-        }
+      einsteinRefs.current = Array(4).fill(null);
     };
 
     // Execução das inicializações
     initializeGame();
     initializeRefs();
-    initializeAudio();
 
     // Cleanup function otimizada
     return () => {
-        // Cleanup de áudios
-        [risadaAudioRef.current, buzinaAudioRef.current].forEach(audio => {
-            if (audio) {
-                audio.pause();
-                audio.removeEventListener('error', () => {});
-            }
-        });
-        
-        // Cleanup de refs
-        einsteinRefs.current = [];
+      // Cleanup de refs
+      einsteinRefs.current = [];
     };
-}, []); // Array de dependências vazio - executa apenas uma vez
+  }, []); // Array de dependências vazio - executa apenas uma vez
 
   const jogoPerdido = vidas === 0;
   const jogoGanho = acertos.length === Grupos.length;
 
   const triggerBubbleVisualDisappearance = useCallback(() => {
 
-  if (balaoAtivo) { 
-    setBalaoAtivo(null); 
+    if (balaoAtivo) {
+      setBalaoAtivo(null);
 
-    if (onBubbleFullyDisappearedCallbackRef.current) {
+      if (onBubbleFullyDisappearedCallbackRef.current) {
         onBubbleFullyDisappearedCallbackRef.current();
         onBubbleFullyDisappearedCallbackRef.current = null;
-    }
-  }
- 
-}, [balaoAtivo]); 
-
-useEffect(() => {
-  const handleGlobalClick = (event:any) => {
-    // Verifica se há um balão ativo
-    if (balaoAtivo) {
-      // Opcional: Verificar se o clique NÃO foi no próprio balão
-      // para evitar fechar acidentalmente ao clicar no balão
-      const balaoElement = event.target.closest('.balao-fala'); // ajuste a classe conforme necessário
-      
-      if (!balaoElement) {
-        triggerBubbleVisualDisappearance();
       }
     }
-  };
 
-  // Adiciona o listener quando há um balão ativo
-  if (balaoAtivo) {
-    document.addEventListener('click', handleGlobalClick);
-  }
+  }, [balaoAtivo]);
 
-  // Cleanup: remove o listener
-  return () => {
-    document.removeEventListener('click', handleGlobalClick);
-  };
-}, [balaoAtivo, triggerBubbleVisualDisappearance]);
+  useEffect(() => {
+    const handleGlobalClick = (event: any) => {
+      // Verifica se há um balão ativo
+      if (balaoAtivo) {
+        // Opcional: Verificar se o clique NÃO foi no próprio balão
+        // para evitar fechar acidentalmente ao clicar no balão
+        const balaoElement = event.target.closest('.balao-fala'); // ajuste a classe conforme necessário
 
-const showBubble = useCallback((frase: string, indexEinstein: number | null, arrowLeft: string | null, callbackToExecuteAfterBubbleDisappears: (() => void) | null = null) => {
-   
+        if (!balaoElement) {
+          triggerBubbleVisualDisappearance();
+        }
+      }
+    };
+
+    // Adiciona o listener quando há um balão ativo
+    if (balaoAtivo) {
+      document.addEventListener('click', handleGlobalClick);
+    }
+
+    // Cleanup: remove o listener
+    return () => {
+      document.removeEventListener('click', handleGlobalClick);
+    };
+  }, [balaoAtivo, triggerBubbleVisualDisappearance]);
+
+  const showBubble = useCallback((frase: string, indexEinstein: number | null, arrowLeft: string | null, callbackToExecuteAfterBubbleDisappears: (() => void) | null = null) => {
+
     // 2. Armazena o callback para ser executado após o balão desaparecer por clique
     onBubbleFullyDisappearedCallbackRef.current = callbackToExecuteAfterBubbleDisappears;
 
     // 3. Define a função interna que efetivamente mostrará o balão
     const executeShowNewBubble = () => {
-        let finalBubbleLeft: string | null = null;
-        let finalArrowLeft: string | null = arrowLeft;
+    const finalBubbleLeft: string | null = null;
+    const finalArrowLeft: string | null = arrowLeft;
 
-        // B. ATUALIZA O ESTADO DO BALÃO APENAS UMA VEZ, com os valores finais calculados
-        setBalaoAtivo({
-            frase,
-            indexEinstein,
-            arrowLeft: finalArrowLeft,
-            bubbleLeft: finalBubbleLeft,
-            bubbleRight: null,
-        } as any);
-      
+      // B. ATUALIZA O ESTADO DO BALÃO APENAS UMA VEZ, com os valores finais calculados
+      setBalaoAtivo({
+        frase,
+        indexEinstein,
+        arrowLeft: finalArrowLeft,
+        bubbleLeft: finalBubbleLeft,
+        bubbleRight: null,
+      } as any);
+
     };
 
     if (balaoAtivo) { // Se já existe um balão ATIVO (balaoAtivo não é null)
-        setIsBubbleFadingOut(true); // Ativa a classe 'fade-out' para o balão atual
-      
+      setIsBubbleFadingOut(true); // Ativa a classe 'fade-out' para o balão atual
 
-        setTimeout(() => {
-            setBalaoAtivo(null); 
-            setIsBubbleFadingOut(false); // Limpa o estado de "fade-out"
-            executeShowNewBubble(); // E só então mostra o novo balão
-        }, FADE_OUT_DURATION_MS);
+
+      setTimeout(() => {
+        setBalaoAtivo(null);
+        setIsBubbleFadingOut(false); // Limpa o estado de "fade-out"
+        executeShowNewBubble(); // E só então mostra o novo balão
+      }, FADE_OUT_DURATION_MS);
     } else { // Se não há balão ativo, mostra o novo imediatamente
-        executeShowNewBubble();
+      executeShowNewBubble();
     }
-}, [balaoAtivo, isBubbleFadingOut, triggerBubbleVisualDisappearance, einsteinRefs, einsteinContainerRef, FADE_OUT_DURATION_MS]);
+  }, [balaoAtivo]);
 
   const [agrupando, setAgrupando] = useState(false);
 
@@ -479,7 +645,7 @@ const showBubble = useCallback((frase: string, indexEinstein: number | null, arr
     const palavrasParaAgrupar = [...palavrasExibidas];
     const fadeOutDelays = palavrasParaAgrupar.map(() => Math.random() * 400); // Mais rápido que embaralhar
     const maxOverallFadeOutDelay = Math.max(...fadeOutDelays.map(delay => delay + 300));
-    
+
     const fadeOutStates = gerarTransitionStates(palavrasParaAgrupar, { opacity: 0, duration: 300 }, i => fadeOutDelays[i]);
     setPalavraTransitionStates(prev => ({ ...prev, ...fadeOutStates }));
 
@@ -487,15 +653,15 @@ const showBubble = useCallback((frase: string, indexEinstein: number | null, arr
     setTimeout(() => {
       // Separa as palavras não selecionadas das selecionadas
       const naoSelecionadas = palavrasAtivas.filter(p => !selecionadas.includes(p));
-      
+
       // Embaralha apenas as palavras NÃO selecionadas para manter o resto aleatório
       const naoSelecionadasEmbaralhadas = shuffleArray(naoSelecionadas);
-      
+
       // ALTERAÇÃO PRINCIPAL: Agrupa as palavras selecionadas sempre no final da lista.
       const novasPalavrasExibidas = [...naoSelecionadasEmbaralhadas, ...selecionadas];
 
       setPalavrasExibidas(novasPalavrasExibidas);
-      
+
       // 4. Animação de Fade-In
       const fadeInDelays = novasPalavrasExibidas.map(() => Math.random() * 400);
       const maxOverallFadeInDelay = Math.max(...fadeInDelays.map(delay => delay + 300));
@@ -504,7 +670,7 @@ const showBubble = useCallback((frase: string, indexEinstein: number | null, arr
       requestAnimationFrame(() => {
         setPalavraTransitionStates(prev => ({ ...prev, ...fadeInStates }));
       });
-      
+
       // 5. Finaliza o estado de "agrupando"
       setTimeout(() => {
         setAgrupando(false);
@@ -513,660 +679,663 @@ const showBubble = useCallback((frase: string, indexEinstein: number | null, arr
     }, maxOverallFadeOutDelay + 50);
 
   }, [
-    agrupando, embaralhando, processandoErro, jogoPerdido, jogoGanho, 
+    agrupando, embaralhando, processandoErro, jogoPerdido, jogoGanho,
     selecionadas, palavrasExibidas, palavrasAtivas
   ]);
 
-const handleLimpar = useCallback(() => {
+  const handleLimpar = useCallback(() => {
     // Se o jogo estiver em um estado que bloqueia ações, não faz nada.
     if (jogoPerdido || jogoGanho || processandoErro || embaralhando || mostrarMensagemMotivacao) return;
-    
+
     // A única ação é redefinir o array de palavras selecionadas.
     setSelecionadas([]);
 
   }, [jogoPerdido, jogoGanho, processandoErro, embaralhando, mostrarMensagemMotivacao]);
 
-// Mova esta função para FORA de verificar e coloque junto com as outras funções principais:
+  // Mova esta função para FORA de verificar e coloque junto com as outras funções principais:
 
-const handleEinsteinClick = useCallback((einsteinIndex: number) => {
-  // Previne clique se está em cooldown ou se o jogo acabou
-  if (einsteinClickCooldowns[einsteinIndex] || jogoPerdido || jogoGanho) return;
-  
-  // Array de animações possíveis (memoizado)
-  const animations = ['bounce', 'heartbeat', 'swing',  'shake',   'jello', 'rubber', 'tada', 'slide-out', 'spin', 'wiggle', 'pulse', 'flip'];
-  const randomAnimation = animations[Math.floor(Math.random() * animations.length)];
-  
-  // Batch de mudanças de estado para reduzir re-renders
-  setEinsteinAnimations(prev => ({
-    ...prev,
-    [einsteinIndex]: randomAnimation
-  }));
-  
-  setEinsteinClickCooldowns(prev => ({
-    ...prev,
-    [einsteinIndex]: true
-  }));
-  
-  // Cleanup otimizado com uma única operação
-  const timeoutId = setTimeout(() => {
-    // Batch cleanup para reduzir re-renders
-    setEinsteinAnimations(prev => {
-      const { [einsteinIndex]: removed, ...rest } = prev;
-      return rest;
-    });
-    
-    setEinsteinClickCooldowns(prev => {
-      const { [einsteinIndex]: removed, ...rest } = prev;
-      return rest;
-    });
-  }, 800);
+  const handleEinsteinClick = useCallback((einsteinIndex: number) => {
+    // Previne clique se está em cooldown ou se o jogo acabou
+    if (einsteinClickCooldowns[einsteinIndex] || jogoPerdido || jogoGanho) return;
 
-  // Cleanup do timeout se o componente for desmontado
-  return () => clearTimeout(timeoutId);
-}, [einsteinClickCooldowns, jogoPerdido, jogoGanho]);
+    // Array de animações possíveis (memoizado)
+    const animations = ['bounce', 'heartbeat', 'swing', 'shake', 'jello', 'rubber', 'tada', 'slide-out', 'spin', 'wiggle', 'pulse', 'flip'];
+    const randomAnimation = animations[Math.floor(Math.random() * animations.length)];
+
+    // Batch de mudanças de estado para reduzir re-renders
+    setEinsteinAnimations(prev => ({
+      ...prev,
+      [einsteinIndex]: randomAnimation
+    }));
+
+    setEinsteinClickCooldowns(prev => ({
+      ...prev,
+      [einsteinIndex]: true
+    }));
+
+    // Cleanup otimizado com uma única operação
+    const timeoutId = setTimeout(() => {
+      // Batch cleanup para reduzir re-renders
+      setEinsteinAnimations(prev => {
+        const { [einsteinIndex]: removed, ...rest } = prev;
+        return rest;
+      });
+
+      setEinsteinClickCooldowns(prev => {
+        const { [einsteinIndex]: removed, ...rest } = prev;
+        return rest;
+      });
+    }, 800);
+
+    // Cleanup do timeout se o componente for desmontado
+    return () => clearTimeout(timeoutId);
+  }, [einsteinClickCooldowns, jogoPerdido, jogoGanho]);
 
   const handleBubbleClick = useCallback(() => {
     triggerBubbleVisualDisappearance();
   }, [triggerBubbleVisualDisappearance]);
 
-useEffect(() => {
-  if (jogoPerdido && !gameOverProcessedRef.current) {
-    gameOverProcessedRef.current = true;
-    
-    setProcessandoErro(true);
-    setAcertosOriginais([...acertos]);
+  useEffect(() => {
+    if (jogoPerdido && !gameOverProcessedRef.current) {
+      gameOverProcessedRef.current = true;
 
-    setGridTransitionClass('grid-fade-out'); 
-    setTimeout(() => {
-      setGridVisivel(false); 
-    }, MOTIVATION_TRANSITION_DURATION); 
+      setProcessandoErro(true);
+      setAcertosOriginais([...acertos]);
 
-    // Grupos não acertados...
-    const gruposNaoAcertados = Grupos.filter(
-      g => !acertos.some(a => a.name === g.name)
-    ).map((g, index) => {
-      const indiceTotal = acertos.length + index;
-      const cor = getGameOverColor(indiceTotal);
-      
-     const coresCSS = [
-  { bg: 'bg-sky-200', border: 'border-sky-400' },
-  { bg: 'bg-amber-200', border: 'border-amber-400' },
-  { bg: 'bg-rose-200', border: 'border-rose-400' },
-  { bg: 'bg-purple-200', border: 'border-purple-400' }
-];
+      setGridTransitionClass('grid-fade-out');
+      setTimeout(() => {
+        setGridVisivel(false);
+      }, MOTIVATION_TRANSITION_DURATION);
 
-      const cssIndex = indiceTotal % coresCSS.length;
-      const cssClasses = coresCSS[cssIndex];
-      
-      return { 
-        ...g,
-        reveladoNoFinal: true,
-        color: cor,
-        backgroundColor: cor,
-        cssClasses: cssClasses,
-        debugIndex: index
-      };
-    });
+      // Grupos não acertados...
+      const gruposNaoAcertados = Grupos.filter(
+        g => !acertos.some(a => a.name === g.name)
+      ).map((g, index) => {
+        const indiceTotal = acertos.length + index;
+        const cor = getGameOverColor(indiceTotal);
 
-    setTimeout(() => {
-        setGruposARevelar(gruposNaoAcertados);
-    }, 800);
+        const coresCSS = [
+          { bg: 'bg-sky-200', border: 'border-sky-400' },
+          { bg: 'bg-amber-200', border: 'border-amber-400' },
+          { bg: 'bg-rose-200', border: 'border-rose-400' },
+          { bg: 'bg-purple-200', border: 'border-purple-400' }
+        ];
 
-    const totalGrupos = acertos.length + gruposNaoAcertados.length;
-    const tempoAnimacaoBarras = 800 + (totalGrupos * 300);
-    const tempoEsperaAdicional = 3500; // TEMPO PARA O EINSTEIN FINAL APARECER
-    
-    setTimeout(() => {
-      console.log("Mostrando Einstein final - jogo perdido!");
-      setMostrarEinsteinFinal(true);
-    }, tempoAnimacaoBarras + tempoEsperaAdicional);
+        const cssIndex = indiceTotal % coresCSS.length;
+        const cssClasses = coresCSS[cssIndex];
 
-console.log("frasesFimDeJogo disponíveis:", frasesFimDeJogo);
-
-setTimeout(() => {
-      // 🔧 CORREÇÃO: Verificar se o array existe antes de usar
-      if (!frasesFimDeJogo || frasesFimDeJogo.length === 0) {
-        console.error("frasesFimDeJogo não está definido!");
-        // Fallback com frase padrão
-        setFraseFinal("Que pena! Mas não desista, a ciência está cheia de tentativas!");
-      } else {
-        const fraseAleatoria = frasesFimDeJogo[Math.floor(Math.random() * frasesFimDeJogo.length)];
-        setFraseFinal(fraseAleatoria);
-      }
-      
-      console.log("Definindo mostrarBalaoFinal como true");
-      setMostrarBalaoFinal(true);
-    }, tempoAnimacaoBarras + tempoEsperaAdicional + 700);
-  }
-}, [jogoPerdido, acertos, Grupos, frasesFimDeJogo]);
-
-// Efeito para carregar os vencedores do localStorage ao iniciar
-useEffect(() => {
-  try {
-    const dadosSalvos = localStorage.getItem('quadroVencedoresEinsteins');
-    if (dadosSalvos) {
-      setVencedores(JSON.parse(dadosSalvos));
-    }
-  } catch (error) {
-    console.error("Falha ao carregar vencedores do localStorage", error);
-  }
-}, []); // Array vazio para executar apenas uma vez
-
-// Efeito para salvar os vencedores no localStorage sempre que a lista for atualizada
-useEffect(() => {
-  try {
-    // Não salva um array vazio no início, apenas após a primeira vitória
-    if (vencedores.length > 0) {
-      localStorage.setItem('quadroVencedoresEinsteins', JSON.stringify(vencedores));
-    }
-  } catch (error) {
-    console.error("Falha ao salvar vencedores no localStorage", error);
-  }
-}, [vencedores]);
-
-
-useEffect(() => {
-  // Reset de todos os estados relacionados ao final quando o jogo reinicia
-  if (vidas === 4 && gameOverProcessedRef.current) {
-    console.log("Resetando estados do Einstein final");
-    gameOverProcessedRef.current = false;
-    setMostrarEinsteinFinal(false);
-    setMostrarBalaoFinal(false);
-    setMostrarEpílogo(false);
-    setEpilogoEncerrado(false);
-    setFraseFinal(null);
-  }
-}, [vidas]);
-
-useEffect(() => {
-  console.log("Estados Einstein Final:", {
-    jogoPerdido,
-    jogoGanho,
-    vidas,
-    mostrarEinsteinFinal,
-    mostrarBalaoFinal,
-    gameOverProcessed: gameOverProcessedRef.current
-  });
-}, [jogoPerdido, jogoGanho, vidas, mostrarEinsteinFinal, mostrarBalaoFinal]);
-
-// Efeito 2: Processa a fila de revelação um por um
-
-// ADICIONE também um useEffect para resetar o gameOverProcessedRef quando necessário:
-useEffect(() => {
-  // Reset da flag quando o jogo reinicia (vidas volta a 4)
-  if (vidas === 4 && gameOverProcessedRef.current) {
-    gameOverProcessedRef.current = false;
-  }
-}, [vidas]);
-
-useEffect(() => {
-  // Se não houver grupos na fila para revelar, não faz nada
-  if (gruposARevelar.length === 0) {
-    return;
-  }
-
-  // Configura um intervalo para revelar o próximo grupo a cada 0.7 segundos
-  const timer = setInterval(() => {
-    setGruposARevelar(prevFila => {
-      // Se a fila está vazia, para o intervalo
-      if (prevFila.length === 0) {
-        clearInterval(timer);
-        return prevFila;
-      }
-
-      // Pega o primeiro grupo da fila
-      const proximoGrupo = prevFila[0];
-      
-      // 🔧 CORREÇÃO PRINCIPAL: Preservar TODAS as propriedades do grupo
-      setAcertos(prevAcertos => {
-        const jaExiste = prevAcertos.some(acerto => acerto.name === proximoGrupo.name);
-        
-        if (!jaExiste) {
-          // 🔧 IMPORTANTE: Usar spread operator para manter TODAS as propriedades
-          // incluindo 'color', 'reveladoNoFinal', etc.
-          const grupoCompleto = {
-            ...proximoGrupo, // Mantém todas as propriedades originais
-            // Se necessário, você pode sobrescrever propriedades específicas aqui
-          };
-          
-          console.log('Adicionando grupo aos acertos:', grupoCompleto);
-          return [...prevAcertos, grupoCompleto];
-        }
-        
-        return prevAcertos;
+        return {
+          ...g,
+          reveladoNoFinal: true,
+          color: cor,
+          backgroundColor: cor,
+          cssClasses: cssClasses,
+          debugIndex: index
+        };
       });
 
-      // Remove o grupo que acabamos de processar da fila
-      return prevFila.slice(1);
+      setTimeout(() => {
+        setGruposARevelar(gruposNaoAcertados);
+      }, 800);
+
+      const totalGrupos = acertos.length + gruposNaoAcertados.length;
+      const tempoAnimacaoBarras = 800 + (totalGrupos * 300);
+      const tempoEsperaAdicional = 3500; // TEMPO PARA O EINSTEIN FINAL APARECER
+
+      setTimeout(() => {
+        console.log("Mostrando Einstein final - jogo perdido!");
+        setMostrarEinsteinFinal(true);
+      }, tempoAnimacaoBarras + tempoEsperaAdicional);
+
+      console.log("frasesFimDeJogo disponíveis:", frasesFimDeJogo);
+
+      setTimeout(() => {
+        // 🔧 CORREÇÃO: Verificar se o array existe antes de usar
+        if (!frasesFimDeJogo || frasesFimDeJogo.length === 0) {
+          console.error("frasesFimDeJogo não está definido!");
+          // Fallback com frase padrão
+          setFraseFinal("Que pena! Mas não desista, a ciência está cheia de tentativas!");
+        } else {
+          const fraseAleatoria = frasesFimDeJogo[Math.floor(Math.random() * frasesFimDeJogo.length)];
+          setFraseFinal(fraseAleatoria);
+        }
+
+        console.log("Definindo mostrarBalaoFinal como true");
+        setMostrarBalaoFinal(true);
+      }, tempoAnimacaoBarras + tempoEsperaAdicional + 700);
+    }
+  }, [jogoPerdido, acertos ]);
+
+  // Efeito para carregar os vencedores do localStorage ao iniciar
+  useEffect(() => {
+    try {
+      const dadosSalvos = localStorage.getItem('quadroVencedoresEinsteins');
+      if (dadosSalvos) {
+        setVencedores(JSON.parse(dadosSalvos));
+      }
+    } catch (error) {
+      console.error("Falha ao carregar vencedores do localStorage", error);
+    }
+  }, []); // Array vazio para executar apenas uma vez
+
+  // Efeito para salvar os vencedores no localStorage sempre que a lista for atualizada
+  useEffect(() => {
+    try {
+      // Não salva um array vazio no início, apenas após a primeira vitória
+      if (vencedores.length > 0) {
+        localStorage.setItem('quadroVencedoresEinsteins', JSON.stringify(vencedores));
+      }
+    } catch (error) {
+      console.error("Falha ao salvar vencedores no localStorage", error);
+    }
+  }, [vencedores]);
+
+
+  useEffect(() => {
+    // Reset de todos os estados relacionados ao final quando o jogo reinicia
+    if (vidas === 4 && gameOverProcessedRef.current) {
+      console.log("Resetando estados do Einstein final");
+      gameOverProcessedRef.current = false;
+      setMostrarEinsteinFinal(false);
+      setMostrarBalaoFinal(false);
+      setEpilogoEncerrado(false);
+      setFraseFinal(null);
+    }
+  }, [vidas]);
+
+  useEffect(() => {
+    if (mostrarInputNome) {
+      // Bloqueia rolagem
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = '0';
+    } else {
+      // Restaura rolagem
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    }
+
+    // Cleanup quando componente desmonta
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [mostrarInputNome]);
+
+  useEffect(() => {
+    console.log("Estados Einstein Final:", {
+      jogoPerdido,
+      jogoGanho,
+      vidas,
+      mostrarEinsteinFinal,
+      mostrarBalaoFinal,
+      gameOverProcessed: gameOverProcessedRef.current
     });
+  }, [jogoPerdido, jogoGanho, vidas, mostrarEinsteinFinal, mostrarBalaoFinal]);
 
-  }, 700); // Intervalo entre cada barra
+  // Efeito 2: Processa a fila de revelação um por um
 
-  // Função de limpeza: para o intervalo se o componente for desmontado
-  return () => clearInterval(timer);
+  // ADICIONE também um useEffect para resetar o gameOverProcessedRef quando necessário:
+  useEffect(() => {
+    // Reset da flag quando o jogo reinicia (vidas volta a 4)
+    if (vidas === 4 && gameOverProcessedRef.current) {
+      gameOverProcessedRef.current = false;
+    }
+  }, [vidas]);
 
-}, [gruposARevelar]);
+  useEffect(() => {
+    // Se não houver grupos na fila para revelar, não faz nada
+    if (gruposARevelar.length === 0) {
+      return;
+    }
 
-// 1. PRIMEIRO: Corrigir a função getGameOverColor para usar as mesmas cores das barras normais
-const getGameOverColor = (index: number): string => {
-  // Usar as mesmas cores que são usadas nas barras normais de acerto
-const coresNormais = [
-  { bg: 'bg-sky-200', border: 'border-sky-400', color: '#bae6fd' }, // sky-200
-  { bg: 'bg-amber-200', border: 'border-amber-400', color: '#fcd34d' }, // amber-200
-  { bg: 'bg-rose-200', border: 'border-rose-400', color: '#fda4af' }, // rose-200
-  { bg: 'bg-purple-200', border: 'border-purple-400', color: '#e9d5ff' } // purple-200
-];
-  
-  const colorIndex = index % coresNormais.length;
-  const selectedColorObj = coresNormais[colorIndex];
-  
-  console.log(`Grupo ${index} recebeu cor ${selectedColorObj.color} (índice ${colorIndex})`);
-  
-  return selectedColorObj.color;
-};
+    // Configura um intervalo para revelar o próximo grupo a cada 0.7 segundos
+    const timer = setInterval(() => {
+      setGruposARevelar(prevFila => {
+        // Se a fila está vazia, para o intervalo
+        if (prevFila.length === 0) {
+          clearInterval(timer);
+          return prevFila;
+        }
 
-const cliquePalavras = useCallback((palavra: string) => {
+        // Pega o primeiro grupo da fila
+        const proximoGrupo = prevFila[0];
+
+        // 🔧 CORREÇÃO PRINCIPAL: Preservar TODAS as propriedades do grupo
+        setAcertos(prevAcertos => {
+          const jaExiste = prevAcertos.some(acerto => acerto.name === proximoGrupo.name);
+
+          if (!jaExiste) {
+            // 🔧 IMPORTANTE: Usar spread operator para manter TODAS as propriedades
+            // incluindo 'color', 'reveladoNoFinal', etc.
+            const grupoCompleto = {
+              ...proximoGrupo, // Mantém todas as propriedades originais
+              // Se necessário, você pode sobrescrever propriedades específicas aqui
+            };
+
+            console.log('Adicionando grupo aos acertos:', grupoCompleto);
+            return [...prevAcertos, grupoCompleto];
+          }
+
+          return prevAcertos;
+        });
+
+        // Remove o grupo que acabamos de processar da fila
+        return prevFila.slice(1);
+      });
+
+    }, 700); // Intervalo entre cada barra
+
+    // Função de limpeza: para o intervalo se o componente for desmontado
+    return () => clearInterval(timer);
+
+  }, [gruposARevelar]);
+
+  // 1. PRIMEIRO: Corrigir a função getGameOverColor para usar as mesmas cores das barras normais
+  const getGameOverColor = (index: number): string => {
+    // Usar as mesmas cores que são usadas nas barras normais de acerto
+    const coresNormais = [
+      { bg: 'bg-sky-200', border: 'border-sky-400', color: '#bae6fd' }, // sky-200
+      { bg: 'bg-amber-200', border: 'border-amber-400', color: '#fcd34d' }, // amber-200
+      { bg: 'bg-rose-200', border: 'border-rose-400', color: '#fda4af' }, // rose-200
+      { bg: 'bg-purple-200', border: 'border-purple-400', color: '#e9d5ff' } // purple-200
+    ];
+
+    const colorIndex = index % coresNormais.length;
+    const selectedColorObj = coresNormais[colorIndex];
+
+    console.log(`Grupo ${index} recebeu cor ${selectedColorObj.color} (índice ${colorIndex})`);
+
+    return selectedColorObj.color;
+  };
+
+  const cliquePalavras = useCallback((palavra: string) => {
     if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
     setSelecionadas(prev =>
       prev.includes(palavra)
         ? prev.filter(p => p !== palavra)
         : prev.length < 4
-        ? [...prev, palavra]
-        : prev
+          ? [...prev, palavra]
+          : prev
     )
-}, [jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao, agrupando]); // Adicione agrupando às dependências
+  }, [jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao ]);
 
-useEffect(() => {
-  let buffer = '';
+  useEffect(() => {
+    let buffer = '';
 
-  const handleKeyPress = (e: KeyboardEvent) => {
-    buffer += e.key.toLowerCase();
+    const handleKeyPress = (e: KeyboardEvent) => {
+      buffer += e.key.toLowerCase();
 
-    // Mantém só os últimos 10 caracteres para evitar acúmulo
-    if (buffer.length > 10) {
-      buffer = buffer.slice(-10);
-    }
+      // Mantém só os últimos 10 caracteres para evitar acúmulo
+      if (buffer.length > 10) {
+        buffer = buffer.slice(-10);
+      }
 
-    // Verifica se a sequência para vencer foi digitada
-    if (buffer.includes('dundies')) {
-      console.log('CHEAT: vitória forçada via "dundies"!');
-      setAcertos([...Grupos]);
-      buffer = '';
-    }
+      // Verifica se a sequência para vencer foi digitada
+      if (buffer.includes('dundies')) {
+        console.log('CHEAT: vitória forçada via "dundies"!');
+        setAcertos([...Grupos]);
+        buffer = '';
+      }
 
-    // Verifica se a sequência para derrota foi digitada
-    if (buffer.includes('ddmfateam')) {
-      console.log('CHEAT: derrota forçada via "ddmfateam"!');
-      setVidas(0);
-      buffer = '';
-    }
-  };
-
-  // Adiciona o listener apenas para a versão web (ignora mobile, pois sem teclado)
-  window.addEventListener('keypress', handleKeyPress);
-
-  return () => window.removeEventListener('keypress', handleKeyPress);
-}, [Grupos]);
-
-useEffect(() => {
-  let clickCount = 0;
-  let timeoutId: NodeJS.Timeout | null = null;
-  let holdTimeoutId: NodeJS.Timeout | null = null;
-
-  const tituloElement = document.querySelector('.einsteins-title');
-
-  if (!tituloElement) return;
-
-  const handleClick = () => {
-    clickCount++;
-
-    // Reseta o contador de cliques após 3s de inatividade
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => (clickCount = 0), 3000);
-
-    if (clickCount === 5) {
-      console.log('CHEAT: vitória forçada via 5 cliques!');
-      setAcertos([...Grupos]);
-      clickCount = 0;
-    }
-  };
-
-  const handleMouseDown = () => {
-    holdTimeoutId = setTimeout(() => {
-      console.log('CHEAT: derrota forçada ao segurar 3s!');
-      setVidas(0);
-      clickCount = 0;
-    }, 3000);
-  };
-
-  const handleMouseUp = () => {
-    if (holdTimeoutId) {
-      clearTimeout(holdTimeoutId);
-      holdTimeoutId = null;
-    }
-  };
-
-  tituloElement.addEventListener('click', handleClick);
-  tituloElement.addEventListener('mousedown', handleMouseDown);
-  tituloElement.addEventListener('mouseup', handleMouseUp);
-  tituloElement.addEventListener('mouseleave', handleMouseUp);
-
-  // Suporte para toque em celular (touchstart/touchend)
-  tituloElement.addEventListener('touchstart', handleMouseDown);
-  tituloElement.addEventListener('touchend', handleMouseUp);
-  tituloElement.addEventListener('touchcancel', handleMouseUp);
-
-  return () => {
-    tituloElement.removeEventListener('click', handleClick);
-    tituloElement.removeEventListener('mousedown', handleMouseDown);
-    tituloElement.removeEventListener('mouseup', handleMouseUp);
-    tituloElement.removeEventListener('mouseleave', handleMouseUp);
-    tituloElement.removeEventListener('touchstart', handleMouseDown);
-    tituloElement.removeEventListener('touchend', handleMouseUp);
-    tituloElement.removeEventListener('touchcancel', handleMouseUp);
-    if (timeoutId) clearTimeout(timeoutId);
-    if (holdTimeoutId) clearTimeout(holdTimeoutId);
-  };
-}, [Grupos]);
-
-// Função para resetar o jogo para o estado inicial
-const reiniciarJogo = useCallback(() => {
-    // Reseta as palavras e frases
-    setFrasesErroDisponiveis(shuffleArray([...frasesErro]));
-    setFrasesQuaseAcertoDisponiveis(shuffleArray([...frasesQuaseAcerto]));
-    const palavrasIniciais = shuffleArray([...todasPalavrasDoJogo]);
-    setPalavrasExibidas(palavrasIniciais);
-    setPalavrasAtivas(todasPalavrasDoJogo);
-    setPalavraTransitionStates(gerarTransitionStates(palavrasIniciais, { opacity: 1, duration: 800 }));
-
-    // Reseta o estado do jogo
-    setSelecionadas([]);
-    setAcertos([]);
-    setAcertosOriginais([]);
-    setVidas(4);
-    setVidasVisiveis([true, true, true, true]);
-    setEinsteinOrder([0, 1, 2, 3]);
-    
-    // Reseta flags de controle
-    setProcessandoErro(false);
-    setEmbaralhando(false);
-    setAgrupando(false);
-    gameOverProcessedRef.current = false;
-    setShufflePressCount(0);
-
-    // Reseta UI
-    setGridVisivel(true);
-    setMostrarInputNome(false);
-    setNomeAtual('');
-}, []); // Dependências vazias, é uma função autocontida
-
-// Função para salvar o nome do vencedor e reiniciar o jogo
-const handleSalvarVencedor = (e:any) => {
-  e.preventDefault();
-  if (nomeAtual.trim()) {
-    const errosRealizados = 4 - vidas;
-    const ranking = calcularRanking(errosRealizados);
-    const novoVencedor = {
-      nome: nomeAtual.trim(),
-      ranking: ranking.titulo, // Adiciona o título do ranking
-      erros: errosRealizados,  // Adiciona a quantidade de erros
-      data: new Date().toLocaleDateString('pt-BR')
+      // Verifica se a sequência para derrota foi digitada
+      if (buffer.includes('ddmfateam')) {
+        console.log('CHEAT: derrota forçada via "ddmfateam"!');
+        setVidas(0);
+        buffer = '';
+      }
     };
-    
-    setVencedores(prev => [...prev, novoVencedor]);
-    setMostrarInputNome(false);
-    setNomeAtual('');
-  }
-};
-// Efeito para mostrar o input de nome ao vencer
-useEffect(() => {
-  if (jogoGanho && !processandoErro) {
-    // Atraso para permitir que a última animação de acerto termine
+
+    // Adiciona o listener apenas para a versão web (ignora mobile, pois sem teclado)
+    window.addEventListener('keypress', handleKeyPress);
+
+    return () => window.removeEventListener('keypress', handleKeyPress);
+  }, []);
+
+  useEffect(() => {
+    let clickCount = 0;
+    let timeoutId: NodeJS.Timeout | null = null;
+    let holdTimeoutId: NodeJS.Timeout | null = null;
+
+    const tituloElement = document.querySelector('.einsteins-title');
+
+    if (!tituloElement) return;
+
+    const handleClick = () => {
+      clickCount++;
+
+      // Reseta o contador de cliques após 3s de inatividade
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => (clickCount = 0), 3000);
+
+      if (clickCount === 5) {
+        console.log('CHEAT: vitória forçada via 5 cliques!');
+        setAcertos([...Grupos]);
+        clickCount = 0;
+      }
+    };
+
+    const handleMouseDown = () => {
+      holdTimeoutId = setTimeout(() => {
+        console.log('CHEAT: derrota forçada ao segurar 3s!');
+        setVidas(0);
+        clickCount = 0;
+      }, 3000);
+    };
+
+    const handleMouseUp = () => {
+      if (holdTimeoutId) {
+        clearTimeout(holdTimeoutId);
+        holdTimeoutId = null;
+      }
+    };
+
+    tituloElement.addEventListener('click', handleClick);
+    tituloElement.addEventListener('mousedown', handleMouseDown);
+    tituloElement.addEventListener('mouseup', handleMouseUp);
+    tituloElement.addEventListener('mouseleave', handleMouseUp);
+
+    // Suporte para toque em celular (touchstart/touchend)
+    tituloElement.addEventListener('touchstart', handleMouseDown);
+    tituloElement.addEventListener('touchend', handleMouseUp);
+    tituloElement.addEventListener('touchcancel', handleMouseUp);
+
+    return () => {
+      tituloElement.removeEventListener('click', handleClick);
+      tituloElement.removeEventListener('mousedown', handleMouseDown);
+      tituloElement.removeEventListener('mouseup', handleMouseUp);
+      tituloElement.removeEventListener('mouseleave', handleMouseUp);
+      tituloElement.removeEventListener('touchstart', handleMouseDown);
+      tituloElement.removeEventListener('touchend', handleMouseUp);
+      tituloElement.removeEventListener('touchcancel', handleMouseUp);
+      if (timeoutId) clearTimeout(timeoutId);
+      if (holdTimeoutId) clearTimeout(holdTimeoutId);
+    };
+  }, []);
+
+  // Função para salvar o nome do vencedor e reiniciar o jogo
+  const handleSalvarVencedor = (e: any) => {
+    e.preventDefault();
+    if (nomeAtual.trim()) {
+      const errosRealizados = 4 - vidas;
+      const ranking = calcularRanking(errosRealizados);
+      const novoVencedor = {
+        nome: nomeAtual.trim(),
+        ranking: ranking.titulo, // Adiciona o título do ranking
+        erros: errosRealizados,  // Adiciona a quantidade de erros
+        data: new Date().toLocaleDateString('pt-BR')
+      };
+
+      setVencedores(prev => [...prev, novoVencedor]);
+      setMostrarInputNome(false);
+      setNomeAtual('');
+    }
+  };
+
+  const handleFecharTelaFinal = useCallback(() => {
+    // Apenas executa se o Einstein final estiver visível
+    if (mostrarEinsteinFinal) {
+      setMostrarEinsteinFinal(false);
+      setMostrarBalaoFinal(false);
+      setMostrarBotoes(false);
+
+      // ADICIONA UM DELAY DE 1 SEGUNDOS ANTES DE MOSTRAR A CAIXA
+      setTimeout(() => {
+        setMostrarBotaoFiquePorDentro(true);
+      }, 1000); // 1 segundo após o einstein final desaparecer
+    }
+  }, [mostrarEinsteinFinal]);
+
+  const handleFecharInputNome = () => {
+    setMostrarInputNome(false); // Esconde o quadro de inserir nome
+    setNomeAtual(''); // Limpa o nome que possa ter sido digitado
+
+    // ADICIONA UM DELAY DE 5 SEGUNDOS
     setTimeout(() => {
-      setMostrarInputNome(true);
-    }, 1500);
-  }
-}, [jogoGanho, processandoErro]);
+    }, 500);
+  };
 
- const verificar = useCallback(() => {
-  if (jogoPerdido || jogoGanho || selecionadas.length !== 4 || processandoErro || mostrarMensagemMotivacao) return;
+  // Função para controlar o fechamento da caixa de e-mail e o fluxo do jogo
+  const handleFecharCaixaEmail = () => {
+    setMostrarCaixaEmail(false);
 
-  setMostrarMensagemMotivacao(false);
+    // Se o jogo foi ganho, agora sim ativamos o modo visual final
+    if (jogoGanho) {
+      setJogoFinalizado(true);
+      setModoVisualFinal(true);
+    }
+  };
 
-  // Verifica se o grupo está 100% correto (4 palavras certas)
-  const grupoCorreto = Grupos.find(group =>
-    selecionadas.filter(p => group.words.includes(p)).length === 4
-  );
+  // Efeito para mostrar o input de nome ao vencer
+  useEffect(() => {
+    if (jogoGanho && !processandoErro && !gameOverProcessedRef.current) {
+      // Atraso para permitir que a última animação de acerto termine
+      setTimeout(() => {
+        setMostrarInputNome(true);
+      }, 1500);
+    }
+  }, [jogoGanho, processandoErro]);
+  const verificar = useCallback(() => {
+    if (jogoPerdido || jogoGanho || selecionadas.length !== 4 || processandoErro || mostrarMensagemMotivacao) return;
 
-  // Verifica se o jogador acertou 3 palavras de um mesmo grupo
-  const grupoParcial = Grupos.find(group =>
-    selecionadas.filter(p => group.words.includes(p)).length === 3
-  );
+    setMostrarMensagemMotivacao(false);
 
-  // ========================== ACERTO COMPLETO (4 certas) ==========================
-  if (grupoCorreto && !acertos.some(a => a.name === grupoCorreto.name)) {
-    setProcessandoErro(true);
-    setPalavrasComAnimacaoSalto(selecionadas);
-    animarTitulo();
+    // Verifica se o grupo está 100% correto (4 palavras certas)
+    const grupoCorreto = Grupos.find(group =>
+      selecionadas.filter(p => group.words.includes(p)).length === 4
+    );
 
-    setTimeout(() => {
-      setPalavrasComAnimacaoSalto([]);
-      setPalavrasEmFadeOut(grupoCorreto.words);
-      triggerBubbleVisualDisappearance();
-      setErroAtivo(false);
-      
+    // Verifica se o jogador acertou 3 palavras de um mesmo grupo
+    const grupoParcial = Grupos.find(group =>
+      selecionadas.filter(p => group.words.includes(p)).length === 3
+    );
 
-      setPalavraTransitionStates(prevStates => {
-        const newStates = { ...prevStates };
-        grupoCorreto.words.forEach(word => {
-          newStates[word] = {
-            opacity: 0,
-            transform: 'scale(0.8)',
-            transitionDuration: 1000,
-            transitionDelay: 0,
-            transitionProperty: 'opacity, transform'
-          } as any;
-        });
-        return newStates;
-      });
+    // ========================== ACERTO COMPLETO (4 certas) ==========================
+    if (grupoCorreto && !acertos.some(a => a.name === grupoCorreto.name)) {
+      setProcessandoErro(true);
+      setPalavrasComAnimacaoSalto(selecionadas);
+      animarTitulo();
 
-       setTimeout(() => {
-        setSelecionadas([]);
-        setAcertos(prev => [...prev, grupoCorreto]);
-        const newPalavrasAtivas = palavrasAtivas.filter(p => !grupoCorreto.words.includes(p));
-        setPalavrasAtivas(newPalavrasAtivas);
-        setPalavrasExibidas(shuffleArray(newPalavrasAtivas));
-        setPalavrasEmFadeOut([]);
+      setTimeout(() => {
+        setPalavrasComAnimacaoSalto([]);
+        triggerBubbleVisualDisappearance();
+        setErroAtivo(false);
+
 
         setPalavraTransitionStates(prevStates => {
           const newStates = { ...prevStates };
-          grupoCorreto.words.forEach(word => delete newStates[word]);
-          newPalavrasAtivas.forEach(word => {
+          grupoCorreto.words.forEach(word => {
             newStates[word] = {
-              opacity: 1,
-              transform: 'scale(1)',
-              transitionDuration: 1200,
+              opacity: 0,
+              transform: 'scale(0.8)',
+              transitionDuration: 1000,
               transitionDelay: 0,
               transitionProperty: 'opacity, transform'
-           } as any;
+            } as any;
           });
           return newStates;
         });
 
-        setProcessandoErro(false);
-      }, 1000); 
+        setTimeout(() => {
+          setSelecionadas([]);
+          setAcertos(prev => [...prev, grupoCorreto]);
+          const newPalavrasAtivas = palavrasAtivas.filter(p => !grupoCorreto.words.includes(p));
+          setPalavrasAtivas(newPalavrasAtivas);
+          setPalavrasExibidas(shuffleArray(newPalavrasAtivas));
 
-    }, 1000);
-  }
+          setPalavraTransitionStates(prevStates => {
+            const newStates = { ...prevStates };
+            grupoCorreto.words.forEach(word => delete newStates[word]);
+            newPalavrasAtivas.forEach(word => {
+              newStates[word] = {
+                opacity: 1,
+                transform: 'scale(1)',
+                transitionDuration: 1200,
+                transitionDelay: 0,
+                transitionProperty: 'opacity, transform'
+              } as any;
+            });
+            return newStates;
+          });
 
-  // ===================== QUASE ACERTO (3 palavras certas) =====================
-  else if (grupoParcial) {
-    setProcessandoErro(true);
-    setErroAtivo(true);
+          setProcessandoErro(false);
+        }, 1000);
 
-    setTimeout(() => {
-      setErroAtivo(false);
+      }, 1000);
+    }
+
+    // ===================== QUASE ACERTO (3 palavras certas) =====================
+    else if (grupoParcial) {
+      setProcessandoErro(true);
+      setErroAtivo(true);
 
       setTimeout(() => {
-        if (vidas > 0) {
-          let fraseParaExibir: string;
-          let proximaFilaFrases = [...frasesQuaseAcertoDisponiveis];
-          if (proximaFilaFrases.length === 0) {
-            proximaFilaFrases = shuffleArray([...frasesQuaseAcerto]);
-          }
-          fraseParaExibir = proximaFilaFrases.shift()!;
-          setFrasesQuaseAcertoDisponiveis(proximaFilaFrases);
+        setErroAtivo(false);
 
-          const indexDaVidaASumir = vidas - 1;
+        setTimeout(() => {
+          if (vidas > 0) {
+            let proximaFilaFrases = [...frasesQuaseAcertoDisponiveis];
+            if (proximaFilaFrases.length === 0) {
+              proximaFilaFrases = shuffleArray([...frasesQuaseAcerto]);
+            }
+            const fraseParaExibir = proximaFilaFrases.shift()!;
+            setFrasesQuaseAcertoDisponiveis(proximaFilaFrases);
 
-          let arrowPosition: string;
-          switch (indexDaVidaASumir) {
-            case 3: arrowPosition = '83%'; break;
-            case 2: arrowPosition = '68.5%'; break;
-            case 1: arrowPosition = '56%'; break;
-            case 0: arrowPosition = '47%'; break;
-            default: arrowPosition = '50%';
-          }
+            const indexDaVidaASumir = vidas - 1;
 
-          const handleLifeLossAndUnlockButtons = () => {
-            setVidas(prev => Math.max(prev - 1, 0));
-            setTimeout(() => {
-              setVidasVisiveis(prev => {
-                const copy = [...prev];
-                if (indexDaVidaASumir >= 0 && einsteinRefs.current?.[indexDaVidaASumir]) {
-                  einsteinRefs.current[indexDaVidaASumir]!.classList.add('vida-quebrando');
-                  setTimeout(() => {
+            let arrowPosition: string;
+            switch (indexDaVidaASumir) {
+              case 3: arrowPosition = '83%'; break;
+              case 2: arrowPosition = '68.5%'; break;
+              case 1: arrowPosition = '56%'; break;
+              case 0: arrowPosition = '47%'; break;
+              default: arrowPosition = '50%';
+            }
+
+            const handleLifeLossAndUnlockButtons = () => {
+              setVidas(prev => Math.max(prev - 1, 0));
+              setTimeout(() => {
+                const copy = [];
+                  if (indexDaVidaASumir >= 0 && einsteinRefs.current?.[indexDaVidaASumir]) {
+                    einsteinRefs.current[indexDaVidaASumir]!.classList.add('vida-quebrando');
+                    setTimeout(() => {
+                      copy[indexDaVidaASumir] = false;
+                      setProcessandoErro(false);
+                    }, VIDA_FADE_OUT_DURATION);
+                  } else {
                     copy[indexDaVidaASumir] = false;
                     setProcessandoErro(false);
-                  }, VIDA_FADE_OUT_DURATION);
-                } else {
-                  copy[indexDaVidaASumir] = false;
-                  setProcessandoErro(false);
-                }
-                return copy;
-              });
-            }, 1000);
-          };
+                  }
+              }, 1000);
+            };
 
-          showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons);
-        } else {
-          setProcessandoErro(false);
-        }
-      }, 100);
-    }, TREMOR_DURATION_MS);
-  }
+            showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons);
+          } else {
+            setProcessandoErro(false);
+          }
+        }, 100);
+      }, TREMOR_DURATION_MS);
+    }
 
-  // ===================== ERRO COMUM (0, 1 ou 2 palavras certas) =====================
-   else {
-    setProcessandoErro(true); 
-    setErroAtivo(true); 
-
-    setTimeout(() => {
-      setErroAtivo(false); 
+    // ===================== ERRO COMUM (0, 1 ou 2 palavras certas) =====================
+    else {
+      setProcessandoErro(true);
+      setErroAtivo(true);
 
       setTimeout(() => {
-        if (vidas > 0) { 
-          const indexDaVidaASumir = vidas - 1; 
+        setErroAtivo(false);
 
-          // Define a função de perder vida, que será usada em ambos os casos (com ou sem balão)
-          const handleLifeLossAndUnlockButtons = () => {
-            setVidas(prev => Math.max(prev - 1, 0)); 
-            setTimeout(() => {
-              setVidasVisiveis(prev => { 
-                const copy = [...prev]; 
-                if (indexDaVidaASumir >= 0 && einsteinRefs.current?.[indexDaVidaASumir]) { 
-                  einsteinRefs.current[indexDaVidaASumir]!.classList.add('vida-quebrando'); 
-                  setTimeout(() => {
-                    copy[indexDaVidaASumir] = false; 
-                    setProcessandoErro(false); 
-                  }, VIDA_FADE_OUT_DURATION); 
-                } else {
-                  copy[indexDaVidaASumir] = false; 
-                  setProcessandoErro(false); 
-                }
-                return copy; 
-              });
-            }, 1000); 
-          };
+        setTimeout(() => {
+          if (vidas > 0) {
+            const indexDaVidaASumir = vidas - 1;
 
-          // NOVO: Condição para mostrar a frase de erro com 70% de chance
-          if (Math.random() < 0.35) {
-            // Comportamento original: Mostra o balão com a frase
-            let fraseParaExibir: string;
-            let proximaFilaFrases = [...frasesErroDisponiveis]; 
-            if (proximaFilaFrases.length === 0) {
-              proximaFilaFrases = shuffleArray([...frasesErro]); 
+            // Define a função de perder vida, que será usada em ambos os casos (com ou sem balão)
+            const handleLifeLossAndUnlockButtons = () => {
+              setVidas(prev => Math.max(prev - 1, 0));
+              setTimeout(() => {
+                  const copy = [];
+                  if (indexDaVidaASumir >= 0 && einsteinRefs.current?.[indexDaVidaASumir]) {
+                    einsteinRefs.current[indexDaVidaASumir]!.classList.add('vida-quebrando');
+                    setTimeout(() => {
+                      copy[indexDaVidaASumir] = false;
+                      setProcessandoErro(false);
+                    }, VIDA_FADE_OUT_DURATION);
+                  } else {
+                    copy[indexDaVidaASumir] = false;
+                    setProcessandoErro(false);
+                  }
+              }, 1000);
+            };
+
+            // NOVO: Condição para mostrar a frase de erro com 70% de chance
+            if (Math.random() < 0.45) {
+              // Comportamento original: Mostra o balão com a frase
+              let proximaFilaFrases = [...frasesErroDisponiveis];
+              if (proximaFilaFrases.length === 0) {
+                proximaFilaFrases = shuffleArray([...frasesErro]);
+              }
+              const fraseParaExibir = proximaFilaFrases.shift()!;
+              setFrasesErroDisponiveis(proximaFilaFrases);
+
+              let arrowPosition: string;
+              switch (indexDaVidaASumir) {
+                case 3: arrowPosition = '83%'; break;
+                case 2: arrowPosition = '68.5%'; break;
+                case 1: arrowPosition = '56%'; break;
+                case 0: arrowPosition = '47%'; break;
+                default: arrowPosition = '50%';
+              }
+
+              showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons);
+            } else {
+              // NOVO: Comportamento para os 30% restantes: Apenas perde a vida, sem balão.
+              handleLifeLossAndUnlockButtons();
             }
-            fraseParaExibir = proximaFilaFrases.shift()!; 
-            setFrasesErroDisponiveis(proximaFilaFrases); 
 
-            let arrowPosition: string; 
-            switch (indexDaVidaASumir) {
-              case 3: arrowPosition = '83%'; break; 
-              case 2: arrowPosition = '68.5%'; break; 
-              case 1: arrowPosition = '56%'; break; 
-              case 0: arrowPosition = '47%'; break; 
-              default: arrowPosition = '50%'; 
-            }
-            
-            showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons); 
           } else {
-            // NOVO: Comportamento para os 30% restantes: Apenas perde a vida, sem balão.
-            handleLifeLossAndUnlockButtons();
+            setProcessandoErro(false);
           }
+        }, 100);
+      }, TREMOR_DURATION_MS);
+    }
 
-        } else {
-          setProcessandoErro(false); 
-        }
-      }, 100); 
-    }, TREMOR_DURATION_MS); 
-  }
+  }, [
+    jogoPerdido, jogoGanho, selecionadas, processandoErro, mostrarMensagemMotivacao,
+    acertos, palavrasAtivas, vidas,
+    frasesErroDisponiveis, frasesQuaseAcertoDisponiveis,
+    triggerBubbleVisualDisappearance, showBubble, animarTitulo
+  ]);
 
-}, [
-  jogoPerdido, jogoGanho, selecionadas, processandoErro, mostrarMensagemMotivacao,
-  acertos, palavrasAtivas, vidas,
-  frasesErroDisponiveis, frasesQuaseAcertoDisponiveis,
-  triggerBubbleVisualDisappearance, showBubble, animarTitulo
-]);
-
-
-
-const embaralhar = useCallback(() => {
+  const embaralhar = useCallback(() => {
     if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
 
     // Batch de estados iniciais para reduzir re-renders
     const updateInitialStates = () => {
-        setShufflePressCount(prev => {
-            const newCount = prev + 1;
-            
-            const frase = fraseDeEmbaralharPorCount.get(newCount);
-            if (frase) {
-                setTimeout(() => {
-                    const { einsteinIndex, arrowPosition } = calcularPosicaoSeta(vidas, vidasOrdemExibição);
-                    showBubble(frase, einsteinIndex, arrowPosition);
-                }, 4200); 
-            }
-            
-            return newCount;
-        });
+      setShufflePressCount(prev => {
+        const newCount = prev + 1;
 
-        setEmbaralhando(true);
-        triggerBubbleVisualDisappearance();
-        setErroAtivo(false);
+        const frase = fraseDeEmbaralharPorCount.get(newCount);
+        if (frase) {
+          setTimeout(() => {
+            const { einsteinIndex, arrowPosition } = calcularPosicaoSeta(vidas, vidasOrdemExibição);
+            showBubble(frase, einsteinIndex, arrowPosition);
+          }, 4200);
+        }
+
+        return newCount;
+      });
+
+      setEmbaralhando(true);
+      triggerBubbleVisualDisappearance();
+      setErroAtivo(false);
     };
 
     updateInitialStates();
-
-    // Pausa áudios de forma otimizada
-    const pauseAudios = () => {
-        [risadaAudioRef.current, buzinaAudioRef.current].forEach(audio => {
-            if (audio && !audio.paused) {
-                audio.pause();
-                audio.currentTime = 0;
-            }
-        });
-    };
-    pauseAudios();
 
     // Sistema de sorteio para os Einsteins 
     const einsteinWinChance = Math.random() < 0.55; // probabilidade dos einsteins embaralharem
@@ -1188,12 +1357,12 @@ const embaralhar = useCallback(() => {
     setOrdemOriginalEinsteins([...vidasOrdemExibição]);
 
     // Einstein shuffle com sorteio
-if (einsteinWinChance) {
-    const einsteinShuffleDelay = Math.random() * (maxRandomDelay * 0.2);
-    
-    setOrdemOriginalEinsteins([...vidasOrdemExibição]); // SALVA a ordem original
+    if (einsteinWinChance) {
+      const einsteinShuffleDelay = Math.random() * (maxRandomDelay * 0.2);
 
-    setTimeout(() => {
+      setOrdemOriginalEinsteins([...vidasOrdemExibição]); // SALVA a ordem original
+
+      setTimeout(() => {
         const novaOrdem = shuffleArray([...vidasOrdemExibição]);
         setEinsteinOrder(novaOrdem);
 
@@ -1201,70 +1370,70 @@ if (einsteinWinChance) {
         setTimeout(() => {
           setEinsteinOrder(ordemOriginalEinsteins ?? [0, 1, 2, 3]);
         }, 2200);
-    }, einsteinShuffleDelay);
+      }, einsteinShuffleDelay);
 
-    setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
-} else {
-    setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
-}
+      setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
+    } else {
+      setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
+    }
     // Função principal de reorganização (mantida igual)
     function reorganizePalavras() {
-        const newPalavrasAtivas = [...palavrasAtivas];
-        const newPalavrasExibidasShuffled = shuffleArray(newPalavrasAtivas);
-        
-        // Batch de atualizações
-        setPalavrasExibidas(newPalavrasExibidasShuffled);
-        
-        // Estados iniciais otimizados
-        const initialFadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra) => {
-            acc[palavra] = { opacity: 0, transitionDelay: 0, transitionDuration: fadeInDurationPerItem };
-            return acc;
-        }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
-        
-        setPalavraTransitionStates(initialFadeInStates);
+      const newPalavrasAtivas = [...palavrasAtivas];
+      const newPalavrasExibidasShuffled = shuffleArray(newPalavrasAtivas);
 
-        // Fade-in otimizado
-        const fadeInDelays = newPalavrasExibidasShuffled.map(() => Math.random() * maxRandomDelay);
-        const maxOverallFadeInDelay = Math.max(...fadeInDelays.map(delay => delay + fadeInDurationPerItem));
+      // Batch de atualizações
+      setPalavrasExibidas(newPalavrasExibidasShuffled);
 
-        const fadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra, index) => {
-            acc[palavra] = {
-                opacity: 1, 
-                transitionDelay: fadeInDelays[index], 
-                transitionDuration: fadeInDurationPerItem
+      // Estados iniciais otimizados
+      const initialFadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra) => {
+        acc[palavra] = { opacity: 0, transitionDelay: 0, transitionDuration: fadeInDurationPerItem };
+        return acc;
+      }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
+
+      setPalavraTransitionStates(initialFadeInStates);
+
+      // Fade-in otimizado
+      const fadeInDelays = newPalavrasExibidasShuffled.map(() => Math.random() * maxRandomDelay);
+      const maxOverallFadeInDelay = Math.max(...fadeInDelays.map(delay => delay + fadeInDurationPerItem));
+
+      const fadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra, index) => {
+        acc[palavra] = {
+          opacity: 1,
+          transitionDelay: fadeInDelays[index],
+          transitionDuration: fadeInDurationPerItem
+        };
+        return acc;
+      }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
+
+      requestAnimationFrame(() => {
+        setPalavraTransitionStates(prev => ({ ...prev, ...fadeInStates }));
+      });
+
+      // Cleanup final otimizado
+      setTimeout(() => {
+        // Batch de operações finais
+        setEmbaralhando(false);
+        setSelecionadas(prev => prev.filter(p => newPalavrasExibidasShuffled.includes(p)));
+
+        setPalavraTransitionStates(prevStates => {
+          const optimizedStates = { ...prevStates };
+          Object.keys(optimizedStates).forEach(word => {
+            optimizedStates[word] = {
+              ...optimizedStates[word],
+              transitionDelay: 0,
+              transitionDuration: 400
             };
-            return acc;
-        }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
-
-        requestAnimationFrame(() => {
-            setPalavraTransitionStates(prev => ({ ...prev, ...fadeInStates }));
+          });
+          return optimizedStates;
         });
-
-        // Cleanup final otimizado
-        setTimeout(() => {
-            // Batch de operações finais
-            setEmbaralhando(false);
-            setSelecionadas(prev => prev.filter(p => newPalavrasExibidasShuffled.includes(p)));
-            
-            setPalavraTransitionStates(prevStates => {
-                const optimizedStates = { ...prevStates };
-                Object.keys(optimizedStates).forEach(word => {
-                    optimizedStates[word] = { 
-                        ...optimizedStates[word], 
-                        transitionDelay: 0, 
-                        transitionDuration: 400 
-                    };
-                });
-                return optimizedStates;
-            });
-        }, maxOverallFadeOutDelay + maxOverallFadeInDelay + 100);
+      }, maxOverallFadeOutDelay + maxOverallFadeInDelay + 100);
     }
 
-}, [
+  }, [
     jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
-    triggerBubbleVisualDisappearance, palavrasExibidas, palavrasAtivas,
-    showBubble, frasesEmbaralhar, vidas, vidasOrdemExibição // ADICIONADO: vidas e vidasOrdemExibição
-]);
+    triggerBubbleVisualDisappearance, palavrasExibidas, palavrasAtivas, 
+    showBubble, vidas, vidasOrdemExibição, ordemOriginalEinsteins
+  ]);
 
   const handleMotivacao = useCallback(() => {
     if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
@@ -1273,26 +1442,17 @@ if (einsteinWinChance) {
     triggerBubbleVisualDisappearance();
     setErroAtivo(false);
 
-    if (risadaAudioRef.current && !risadaAudioRef.current.paused) {
-      risadaAudioRef.current.pause();
-      risadaAudioRef.current.currentTime = 0;
-    }
-    if (buzinaAudioRef.current && !buzinaAudioRef.current.paused) {
-      buzinaAudioRef.current.pause();
-      buzinaAudioRef.current.currentTime = 0;
-    }
-
     setGridTransitionClass('grid-fade-out');
     const fraseAleatoria = frasesMotivacionais[Math.floor(Math.random() * frasesMotivacionais.length)];
     setMensagemMotivacionalAtual(fraseAleatoria);
 
     setTimeout(() => {
-  setGridVisivel(false);
-  setMostrarMensagemMotivacao(true);
-  requestAnimationFrame(() => {
-    setMessageTransitionClass('fade-in');
-  });
-}, MOTIVATION_TRANSITION_DURATION);
+      setGridVisivel(false);
+      setMostrarMensagemMotivacao(true);
+      requestAnimationFrame(() => {
+        setMessageTransitionClass('fade-in');
+      });
+    }, MOTIVATION_TRANSITION_DURATION);
   }, [
     jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
     triggerBubbleVisualDisappearance,
@@ -1313,122 +1473,119 @@ if (einsteinWinChance) {
     }, MOTIVATION_TRANSITION_DURATION);
   }, []);
 
-  const iniciarDesabamento = () => {
-  console.log('Iniciando desabamento...'); // Debug
-  
-  // Função auxiliar para encontrar letras
-  const encontrarLetras = () => {
-    // Tentar diferentes seletores
-    const seletores = [
-      '.einsteins-title .letter',
-      '.title-wave-animation .letter',
-      '.einsteins-title span',
-      '.title-container .letter'
-    ];
-    
-    for (const seletor of seletores) {
-      const letras = document.querySelectorAll(seletor);
-      if (letras.length > 0) {
-        console.log(`Letras encontradas com seletor: ${seletor}`);
-        return letras;
-      }
+  const menuItemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { type: 'spring', stiffness: 100 },
+    },
+    exit: {
+      opacity: 0,
+      y: -20, // Move para cima ao sair
     }
-    
-    return null;
   };
 
-  // Função para criar letras se não existirem
-  const criarLetrasSeNecessario = () => {
-    const titulo: any = document.querySelector('.einsteins-title');
-    if (!titulo) {
-      console.error('Título não encontrado');
-      return null;
-    }
+  return (
+    <>
+      {/* ========== MENU INICIAL ========== */}
+      <AnimatePresence>
+        {mostrarMenuInicial && (
+          <motion.div
+            className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 px-4 py-8 text-center"
+            initial={{ opacity: 0, filter: "blur(8px)" }}
+            animate={{ opacity: 1, filter: "blur(0px)" }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1 }}
+          >
+            <motion.h1
+              className="einsteins-title text-5xl font-bold tracking-widest mb-10 select-none title-wave-animation"
+              variants={menuItemVariants}
+            >
+              {"EINSTEINS".split("").map((letra, i) => (
+                <span
+                  key={i}
+                  className="letter inline-block"
+                  style={{ animationDelay: `${1 + i * 0.1}s` }}
+                >
+                  {letra}
+                </span>
+              ))}
+            </motion.h1>
 
-    const texto = titulo.textContent || titulo.innerText;
-    if (!texto) {
-      console.error('Texto do título não encontrado');
-      return null;
-    }
+            <motion.button
+              onClick={() => setMostrarMenuInicial(false)}
+              className="w-full max-w-xs bg-gray-900 text-white px-6 py-3 font-bold mt-16 mb-4 border-2 border-gray-800 shadow hover:scale-[1.03] transition-all duration-300"
+              variants={menuItemVariants}
+            >
+              JOGAR
+            </motion.button>
 
-    // Criar estrutura de letras
-    titulo.innerHTML = texto.split('').map((char:any) => 
-      `<span class="letter" style="display: inline-block; transform-origin: center bottom;">${char}</span>`
-    ).join('');
-    
-    return titulo.querySelectorAll('.letter');
-  };
+            <motion.button
+              onClick={() => {
 
-  // 1. Tentar encontrar ou criar as letras
-  let letras = encontrarLetras();
-  
-  if (!letras || letras.length === 0) {
-    console.log('Letras não encontradas, tentando criar...');
-    letras = criarLetrasSeNecessario();
-  }
+                setMostrarComoJogar(true);
+              }}
+              className="w-full max-w-xs bg-white text-gray-800 px-6 py-3 font-semibold border-2 border-gray-800 hover:bg-gray-100 transition-all duration-300"
+              variants={menuItemVariants}
+            >
+              COMO JOGAR
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-  // 2. Animar letras individualmente
-  if (letras && letras.length > 0) {
-    console.log(`Animando ${letras.length} letras`);
-    
-    letras.forEach((letra, i) => {
-      const elemento = letra as HTMLElement;
-      
-      // Garantir propriedades necessárias
-      elemento.style.display = 'inline-block';
-      elemento.style.transformOrigin = 'bottom';
-      
-      // Aplicar animação
-      elemento.style.transition = 'transform 7s ease-out, opacity 7s ease-out';
-      elemento.style.transitionDelay = `${i * 100}ms`;
-      
-      // Usar requestAnimationFrame para garantir que a transição seja aplicada
-      requestAnimationFrame(() => {
-        elemento.style.transform = `translateY(${Math.random() * 300 + 1000}px) rotate(${Math.random() * 30 - 15}deg)`;
-        elemento.style.opacity = '0';
-      });
-    });
-  } else {
-    // Fallback: animar título inteiro
-    console.log('Fallback: animando título inteiro');
-    const titulo = document.querySelector('.einsteins-title');
-    if (titulo) {
-      const elemento = titulo as HTMLElement;
-      elemento.style.transition = 'transform 3s ease-out, opacity 0.8s ease-out';
-      requestAnimationFrame(() => {
-        elemento.style.transform = 'translateY(200px) rotate(15deg) scale(0.8)';
-        elemento.style.opacity = '0';
-      });
-    }
-  }
+      {/* ========== CAIXA COMO JOGAR ========== */}
+      <AnimatePresence>
+        {mostrarComoJogar && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center px-4 sm:px-6"
+            onClick={() => {
+              setMostrarComoJogar(false);
+              setMostrarMenuInicial(true);
+            }}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <motion.div
+              id="caixa-como-jogar"
+              className="relative bg-white p-6 sm:p-8 rounded-2xl w-full max-w-[600px] shadow-2xl overflow-hidden z-10 border-4 border-gray-300"
+              initial={{ scale: 0.1, y: 80 }}
+              animate={{ scale: 1, y: 0, rotate: 0 }}
+              exit={{ scale: 0, rotate: 1080 }}
+              onAnimationStart={() => {
+                document.querySelector("#caixa-como-jogar")?.classList.add("rainbow-border");
+              }}
+              transition={{
+                duration: 1.5,
+                ease: "easeInOut",
+              }}
+            >
+              {/* Efeitos decorativos */}
+              <div className="absolute -top-10 -left-10 w-32 h-32 bg-indigo-100/40 rounded-full blur-2xl pointer-events-none"></div>
+              <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-indigo-200/30 rounded-full blur-2xl pointer-events-none"></div>
 
-  // 3. Após animação do título, animar o main
-  setTimeout(() => {
-    console.log('Animando container principal...');
-    const main = document.querySelector('main');
-    if (main) {
-      const elemento = main as HTMLElement;
-      elemento.style.transition = 'transform 4s ease-in, opacity 1s ease-in';
-      elemento.style.transformOrigin = 'center top';
-      
-      requestAnimationFrame(() => {
-        elemento.style.transform = 'translateY(500px) scale(0.9)';
-        elemento.style.opacity = '0';
-      });
-    }
-    
-    // 4. Finalizar após todas as animações
-    setTimeout(() => {
-      console.log('Desabamento concluído');
-      setEpilogoEncerrado(true);
-    }, 1200);
-  }, 800);
-};
+              <h2 className="text-3xl font-bold mb-6 text-gray-900 tracking-wide text-center">
+                Como Jogar
+              </h2>
 
-  return ( 
-     <>
-       
-<style jsx>{`
+              <ul className="space-y-6 text-gray-700 text-lg leading-relaxed list-disc pl-6 marker:text-indigo-600">
+                <li><strong>Forme 4 grupos de 4 palavras</strong> que tenham algo em comum.</li>
+                <li>Você verá 16 palavras embaralhadas na tela.</li>
+                <li>Cada erro faz um Einstein desaparecer.</li>
+                <li>Você tem 4 chances para completar o desafio.</li>
+                <li>Ao vencer, insira seu nome no quadro de vencedores.</li>
+              </ul>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
+
+      <style jsx>{`
   .btn-press-effect {
     transition: opacity 0.15s ease-in-out;
   }
@@ -1438,24 +1595,57 @@ if (einsteinWinChance) {
     transition: transform 0.2s ease-out;
   }
 
+  .ocultar-suave {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s ease;
+}
+
   .einsteins-title .letter {
     display: inline-block;
-    animation-fill-mode: both;
-    will-change: transform;
-    transform: translateZ(0);
-    backface-visibility: hidden;
-    perspective: 1000px;
-    contain: layout style paint;
-    animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+   animation-fill-mode: forwards !important;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+  contain: layout style paint;
+  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: transform 0.3s ease-in-out;
+}
+.letra-animada-final {
+  transform: translateY(1200px) rotate(12deg);
+  opacity: 0;
+  transition: transform 7s ease-out, opacity 7s ease-out;
+}
+
+@keyframes rainbowBorder {
+  0% {
+    border-color: red;
   }
+  20% {
+    border-color: orange;
+  }
+  40% {
+    border-color: yellow;
+  }
+  60% {
+    border-color: green;
+  }
+  80% {
+    border-color: blue;
+  }
+  100% {
+    border-color: violet;
+  }
+}
 
-  🔧 Guia de Implementação - Correção das Cores das Barras
-Problema Identificado
-As barras de acerto estão aparecendo cinzas quando o jogador perde porque:
+.rainbow-border {
+  animation: rainbowBorder 1.2s linear infinite;
+  border-width: 4px;
+  border-style: solid;
+  border-radius: 1rem; /* match rounded-2xl */
+}
 
-As cores estão sendo definidas no JavaScript, mas não aplicadas no CSS
-Pode haver conflito entre estilos CSS e inline styles
-A propriedade color não está sendo convertida para backgroundColor no CSS
 
 css.theme-result-item {
   color: white !important;
@@ -1694,13 +1884,13 @@ css.theme-result-item {
             position: absolute; background: #fff; border: 3px solid #ccc; border-radius: 0.5rem;
             padding: 0.5rem 0.75rem; font-size: 0.8rem; color: #333; text-align: center;
             word-wrap: break-word; box-sizing: border-box; z-index: 10;
-            bottom: calc(100% + 10px); box-shadow: 0 4px 5px rgba(0,0,0,0.2);
+            bottom: calc(100% + 19px); box-shadow: 0 7px 8px rgba(0,0,0,0.2);
             pointer-events: none; left: 0; right: 0; transform: none;
             max-width: none; width: auto; min-width: 150px;
             @media (min-width: 640px) {
                 left: 7%; right: auto; transform: translateX(-50%);
                 max-width: 600px; width: auto; min-width: 460px;
-                font-size: 1rem; padding: 0.75rem 1rem;
+                font-size: 1rem; padding: 0.95rem 1rem;
             }
         }
         .speech-bubble.active { pointer-events: auto; cursor: pointer; }
@@ -1845,24 +2035,17 @@ css.theme-result-item {
             
 
  @keyframes waveAnimation {
-  0% {
-    transform: translateY(0px) translateZ(0); /* Valores explícitos em px */
-  }
-  20% {
-    transform: translateY(-8px) translateZ(0);
-  }
-  40% {
-    transform: translateY(0px) translateZ(0);
-  }
-  60% {
-    transform: translateY(-4px) translateZ(0);
-  }
-  80% {
-    transform: translateY(0px) translateZ(0);
-  }
-  100% {
-    transform: translateY(0px) translateZ(0); /* Estado final explícito */
-  }
+  0%   { transform: translateY(0px) translateZ(0); }
+  10%  { transform: translateY(-10px) translateZ(0); }
+  20%  { transform: translateY(2px) translateZ(0); }
+  30%  { transform: translateY(-6px) translateZ(0); }
+  40%  { transform: translateY(1px) translateZ(0); }
+  50%  { transform: translateY(-4px) translateZ(0); }
+  60%  { transform: translateY(0px) translateZ(0); }
+  70%  { transform: translateY(-2px) translateZ(0); }
+  80%  { transform: translateY(0px) translateZ(0); }
+  90%  { transform: translateY(-1px) translateZ(0); }
+  100% { transform: translateY(0px) translateZ(0); }
 }
 
 /* DELAYS OTIMIZADOS - Calculados para suavidade máxima */
@@ -1889,14 +2072,16 @@ css.theme-result-item {
 }
   .title-wave-animation .letter {
   animation-name: waveAnimation !important;
-  animation-duration: 1.5s !important;
-  animation-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  animation-duration: 3.2s !important;
   animation-iteration-count: 1 !important;
-  animation-fill-mode: both !important;
+  animation-fill-mode: forwards !important;
+  animation-timing-function: ease-in-out;
   display: inline-block !important;
-  
-  /* NOVO: Força otimização durante a animação */
   will-change: transform !important;
+}
+
+.title-wave-animation .letter:hover {
+  transform: scale(1.1) !important;
 }
 
 .speech-bubble-final {
@@ -1960,17 +2145,26 @@ useEffect(() => {
   // Lógica de ativação do cheat
   if (tituloTapCount === 5) {
     forcarVitoria();
-    setTituloTapCount(0); // Zera o contador após ativar
   } else if (tituloTapCount === 10) {
     forcarDerrota();
-    setTituloTapCount(0); // Zera o contador após ativar
   }
+
+  import { useEffect } from "react";
+
+useEffect(() => {
+  if (!mostrarComoJogar) {
+    // quando começa a sair, adiciona arco-íris
+    const caixa = document.getElementById("caixa-como-jogar");
+    if (caixa) {
+      caixa.classList.add("rainbow-border");
+    }
+  }
+}, [mostrarComoJogar]);
 
   // Cria um novo timer. Se o usuário não tocar novamente em 2 segundos,
   // a contagem é zerada.
   cheatResetTimer.current = setTimeout(() => {
     console.log('Contador de cheat zerado por inatividade.');
-    setTituloTapCount(0);
   }, 2000); // 2 segundos de tempo limite
 
 }, [tituloTapCount, forcarVitoria, forcarDerrota]);
@@ -1979,174 +2173,192 @@ import { AnimatePresence } from 'framer-motion';
 
       `}</style>
       {/* Container para o título fora do main */}
-       <div 
-        className="title-container"
-        onClick={() => setTituloTapCount(prev => prev + 1)}
+      <div
+        className="title-container"        
       >
-        <TituloAnimado tituloAnimando={tituloAnimando} />
+        {!mostrarMenuInicial && (
+          <TituloAnimado tituloAnimando={tituloAnimando} />
+        )}
       </div>
-{mostrarEinsteinFinal && !epilogoEncerrado && (
-  <motion.div 
-    className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-white/90"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    transition={{ duration: 1 }}
-  >
-    <motion.img 
-      src="/einstein_final.png"
-      alt="Einstein Final"
-      className="w-28 sm:w-40 mb-4"
-      initial={{ scale: 0.7 }}
-      animate={{ scale: 1 }}
-      transition={{ type: "spring", stiffness: 120, damping: 20 }}
-    />
 
-    {mostrarBalaoFinal && (
-   <motion.div 
-  className="speech-bubble-final"
-  onClick={() => {
-    setMostrarEinsteinFinal(false);
-    setMostrarBalaoFinal(false);
-    setMostrarEpílogo(false);
-    iniciarDesabamento();
-  }}
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ delay: 0.6, duration: 1.5 }}
->
-  {fraseFinal}
-</motion.div>
-    )}
-  </motion.div>
-)}
+      <AnimatePresence>
+        {mostrarEinsteinFinal && !epilogoEncerrado && (
+          <motion.div
+            className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-white/90 cursor-pointer"
+            initial={{ opacity: 0, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{
+              opacity: 0,
+              scale: 1.2,
+              filter: "blur(10px)",
+              transition: { duration: 1.8, ease: "easeOut" }
+            }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            onClick={handleFecharTelaFinal}
+          >
+            <motion.img
+              src="/einstein_final.png"
+              alt="Einstein Final"
+              className="w-28 sm:w-40 mb-4 select-none pointer-events-none"
+              initial={{ scale: 0.7 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", stiffness: 120, damping: 20 }}
+            />
 
-<main ref={mainContainerRef} className="p-4 max-w-xl mx-auto min-h-screen flex flex-col justify-start bg-white border border-gray-300 shadow-lg sm:p-6">
-       
-       
-        {/* BARRAS DE ACERTO */}
-        <div
-          className=" -mb-2 space-y-2 sm:-mb-0 sm: mt-0 sm:space-y-2"
-          style={{
-            minHeight: `${acertos.length  * 60}px`, 
-            transition: 'min-height 0.8s ease-out'
-          }}
-        >
- {acertos.map((g:any, i) => {
-  const cores = [
-    'bg-sky-200 border-sky-400',
-    'bg-amber-200 border-amber-400', 
-    'bg-rose-200 border-rose-400',
-    'bg-purple-200 border-purple-400'
-  ]; 
-  
-  const marginForLastItem = i === acertos.length - 1 ? ' mb-4 sm:mb-3' : '';
+            {mostrarBalaoFinal && (
+              <motion.div
+                className="speech-bubble-final"
+                initial={{ opacity: 0, filter: "blur(8px)", y: 20 }}
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                exit={{ opacity: 0, filter: "blur(8px)", y: -10 }}
+                transition={{
+                  duration: 1,
+                  ease: "easeOut",
+                  delay: 0.1
+                }}
+              >
+                {fraseFinal}
+              </motion.div>
+            )}
+          </motion.div>
+        )}
 
-  // 🔧 CORREÇÃO PRINCIPAL: Usar as classes CSS corretas mesmo para grupos revelados
-  const foiAcertoDoJogador = acertosOriginais.some(a => a.name === g.name);
-  
-  let classeDeFundo;
-  if (jogoPerdido && !foiAcertoDoJogador) {
-    // Se o grupo foi revelado no final, usar as classes CSS que foram definidas
-    classeDeFundo = g.cssClasses ? `${g.cssClasses.bg} ${g.cssClasses.border}` : cores[i % cores.length];
-  } else {
-    // Acerto normal do jogador
-    classeDeFundo = cores[i % cores.length];
-  }
+      </AnimatePresence>
+      {!mostrarMenuInicial && (
+        <main ref={mainContainerRef} className="p-4 max-w-xl mx-auto min-h-screen flex flex-col justify-start bg-white border border-gray-300 shadow-lg sm:p-6">
 
-  return (
-    <motion.div
-      key={g.name}
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -50 }}
-      transition={{ 
-        duration: 1.2,
-        ease: "easeOut",
-        delay: 0.3,
-        type: "spring",
-        damping: 40,
-        stiffness: 80
-      }} 
-      className={`p-2 border ${classeDeFundo} flex flex-col items-center text-center rounded${marginForLastItem}`}
-    >
-      <strong className="mb-1 text-sm sm:text-base font-bold">
-        {g.name.toUpperCase()}
-      </strong>
-      <span className="text-xs sm:text-sm">
-        {g.words.map((w:any)=> w.toUpperCase()).join(', ')}
-      </span>
-    </motion.div>
-  );
-})}
-        </div>
-        
 
-{gridVisivel && (
-  <motion.div 
-    layout     
-    transition={{
-      type: "spring",       
-      delay: 0,
-      stiffness: 85,       
-      damping: 15,          
-      duration: 1,     
-      ease: "easeOut",   
-    }}
-    className={`grid grid-cols-4 mt-2.5 gap-2.5 mb-5 grid-transition sm:gap-3 sm:mb-6 sm:mt-1 ${gridTransitionClass}`}
-    style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
-  >
-   {palavrasExibidas.map((palavra, index) => {
-const state = palavraTransitionStates[palavra] || defaultTransitionState;
-  const shakeClass = tremorBotoesErro && selecionadas.includes(palavra) ? 'shake-animation' : '';
-  
-  // NOVO: Verifica se a palavra deve ter animação de salto
-  const jumpClass = palavrasComAnimacaoSalto.includes(palavra) 
-    ? `word-jump-animation word-jump-delay-${(selecionadas.indexOf(palavra) % 4) + 1}` 
-    : '';
-  
-  return (
-   <motion.button
-  key={palavra}
-  layout
-  initial={{ opacity: 0, scale: 0.2 }}
-  animate={{ 
-    opacity: state.opacity, // CORRIGIDO: Obedece ao estado de opacidade
-    scale: 1 
-  }}
-  exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.5 } }}
-  transition={{
-    type: "spring",
-    duration: 0.6,   
-    stiffness: 50,  
-    damping: 20,
-    layout: { 
-      type: "spring",
-      duration: 0.8,   
-      stiffness: 100,
-      damping: 35,
-    },
-    opacity: {
-      
-      duration: (state.transitionDuration / 1000),
-      delay: (state.transitionDelay / 1000),
-      ease: "easeInOut"
-    }
-  }}
-  onClick={() => cliquePalavras(palavra)}
-  disabled={jogoPerdido || jogoGanho || !palavrasAtivas.includes(palavra) || processandoErro || embaralhando || mostrarMensagemMotivacao}
-  className={`p-3 border-2 sm:border-8 shadow-lg text-xs
+          {/* BARRAS DE ACERTO */}
+          <div
+            className=" -mb-2 space-y-2 sm:-mb-0 sm: mt-0 sm:space-y-2"
+            style={{
+              minHeight: `${acertos.length * 60}px`,
+              transition: 'min-height 0.8s ease-out'
+            }}
+          >
+            {acertos.map((g: any, i) => {
+              const cores = [
+                'bg-sky-200 border-sky-400',
+                'bg-amber-200 border-amber-400',
+                'bg-rose-200 border-rose-400',
+                'bg-purple-200 border-purple-400'
+              ];
+
+              const marginForLastItem = i === acertos.length - 1 ? ' mb-4 sm:mb-3' : '';
+
+              // 🔧 CORREÇÃO PRINCIPAL: Usar as classes CSS corretas mesmo para grupos revelados
+              const foiAcertoDoJogador = acertosOriginais.some(a => a.name === g.name);
+
+              let classeDeFundo;
+              if (jogoPerdido && !foiAcertoDoJogador) {
+                // Se o grupo foi revelado no final, usar as classes CSS que foram definidas
+                classeDeFundo = g.cssClasses ? `${g.cssClasses.bg} ${g.cssClasses.border}` : cores[i % cores.length];
+              } else {
+                // Acerto normal do jogador
+                classeDeFundo = cores[i % cores.length];
+              }
+
+              return (
+                <motion.div
+                  key={g.name}
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{
+                    scale: [1, 1.2, 0.8, 0],
+                    rotate: [0, 180, 360],
+                    opacity: [1, 1, 0],
+                    x: 0,
+                    y: 0,
+                  }}
+                  transition={{
+                    duration: 1.2,
+                    ease: "easeOut",
+                    delay: 0.3,
+                    type: "spring",
+                    damping: 40,
+                    stiffness: 80
+                  }}
+                  className={`p-2 border ${classeDeFundo} flex flex-col items-center text-center rounded${marginForLastItem}`}
+                >
+                  <strong className="mb-1 text-sm sm:text-base font-bold">
+                    {g.name.toUpperCase()}
+                  </strong>
+                  <span className="text-xs sm:text-sm">
+                    {g.words.map((w: any) => w.toUpperCase()).join(', ')}
+                  </span>
+                </motion.div>
+              );
+            })}
+          </div>
+
+
+          {gridVisivel && !jogoFinalizado && (
+            <motion.div
+              layout
+              transition={{
+                type: "spring",
+                delay: 0,
+                stiffness: 85,
+                damping: 15,
+                duration: 1,
+                ease: "easeOut",
+              }}
+              className={`grid grid-cols-4 mt-2.5 gap-2.5 mb-5 grid-transition sm:gap-3 sm:mb-6 sm:mt-1 ${gridTransitionClass}`}
+              style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
+            >
+              {palavrasExibidas.map((palavra) => {
+                const state = palavraTransitionStates[palavra] || defaultTransitionState;
+                const shakeClass = tremorBotoesErro && selecionadas.includes(palavra) ? 'shake-animation' : '';
+
+
+                // NOVO: Verifica se a palavra deve ter animação de salto
+                const jumpClass = palavrasComAnimacaoSalto.includes(palavra)
+                  ? `word-jump-animation word-jump-delay-${(selecionadas.indexOf(palavra) % 4) + 1}`
+                  : '';
+
+                return (
+                  <motion.button
+                    key={palavra}
+                    layout
+                    initial={{ opacity: 0, scale: 0.2 }}
+                    animate={{
+                      opacity: state.opacity, // CORRIGIDO: Obedece ao estado de opacidade
+                      scale: 1
+                    }}
+                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.5 } }}
+                    transition={{
+                      type: "spring",
+                      duration: 0.6,
+                      stiffness: 50,
+                      damping: 20,
+                      layout: {
+                        type: "spring",
+                        duration: 0.8,
+                        stiffness: 100,
+                        damping: 35,
+                      },
+                      opacity: {
+
+                        duration: (state.transitionDuration / 1000),
+                        delay: (state.transitionDelay / 1000),
+                        ease: "easeInOut"
+                      }
+                    }}
+                    onClick={() => cliquePalavras(palavra)}
+                    disabled={jogoPerdido || jogoGanho || !palavrasAtivas.includes(palavra) || processandoErro || embaralhando || mostrarMensagemMotivacao}
+                    className={`p-3 border-2 sm:border-8 shadow-lg text-xs hover:scale-[1.03]
     ${selecionadas.includes(palavra) ? 'bg-gray-900 text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-500 hover:bg-gray-100'}
     ${jogoPerdido && todasPalavrasDoJogo.includes(palavra) ? 'palavra-correta-perdeu' : ''}
     sm:p-4 sm:text-lg ${shakeClass} ${jumpClass}`}
->
-  {palavra}
-</motion.button>
-  );
-})}
-  </motion.div>
-)}
+                  >
+                    {palavra}
+                  </motion.button>
+                );
+              })}
+            </motion.div>
+          )}
 
-        {mostrarMensagemMotivacao && (
+          {mostrarMensagemMotivacao && (
             <div
               className={`motivation-message-container ${MotivacaoTransition}`}
               onClick={handleClickMensagemMotivacao}
@@ -2154,322 +2366,417 @@ const state = palavraTransitionStates[palavra] || defaultTransitionState;
             >
               <p className="motivation-message-text">{mensagemMotivacionalAtual}</p>
             </div>
-        )}
-        
-<div 
-  ref={einsteinContainerRef} 
-  className={`flex justify-center items-center gap-3 mb-2 sm:gap-5 sm:mb-5 relative w-full layout-shift-container ${
-    balaoAtivo ? 'layout-shift-down' : ''
-  }`}
->
-  {/* Seu código dos Einsteins aqui */}
-  <AnimatePresence mode="popLayout">
-    {vidasOrdemExibição.map((originalIndex) => (
-      originalIndex < vidas && (
-        <motion.div
-          key={originalIndex} 
-          layoutId={`einstein-${originalIndex}`}
-          ref={(el:any) => einsteinRefs.current[originalIndex] = el}
-          className={`relative flex justify-center items-center w-16 h-16 sm:w-24 sm:h-24
+          )}
+
+
+          {!modoVisualFinal && (
+            <div
+              ref={einsteinContainerRef}
+              className={`flex justify-center items-center gap-3 mb-2 sm:gap-5 sm:mb-5 relative w-full layout-shift-container ${balaoAtivo ? 'layout-shift-down' : ''
+                }`}
+
+            >
+              {/* Seu código dos Einsteins aqui */}
+              <AnimatePresence mode="popLayout">
+                {vidasOrdemExibição.map((originalIndex) => (
+                  originalIndex < vidas && (
+                    <motion.div
+                      key={originalIndex}
+                      layoutId={`einstein-${originalIndex}`}
+                      ref={(el: any) => einsteinRefs.current[originalIndex] = el}
+                      className={`relative flex justify-center items-center w-16 h-16 sm:w-24 sm:h-24
             einstein-clickable
             ${einsteinAnimations[originalIndex] ? `einstein-${einsteinAnimations[originalIndex]}` : ''}
             ${einsteinClickCooldowns[originalIndex] ? 'einstein-cooldown' : ''}
             ${tremorBotoesErro ? 'shake-animation' : ''}
           `}
-          initial={{ opacity: 1, scale: 1 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.2, rotate: 100, transition: { duration: 1.4 } }}
-          transition={{ layout: { type: "spring", stiffness: 159, damping: 72 } }}
-          onClick={() => handleEinsteinClick(originalIndex)}
-        >
-          <img
-            src="https://www.pngplay.com/wp-content/uploads/6/Albert-Einstein-Tongue-PNG.png"
-            alt="Vida"
-            className="w-full h-full select-none" 
-            draggable={false}
-            loading="lazy"
-          />
-        </motion.div>
-      )
-    ))}
-  </AnimatePresence>
-
-  <AnimatePresence>
-    {mostrarEinsteinFinal && (
-      <motion.div 
-        className="einstein-final"
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ 
-          opacity: 0, 
-          scale: 0.8,
-          transition: { 
-            duration: 1.2, // Aumentado para transição mais suave
-            ease: "easeInOut" 
-          }
-        }}
-        transition={{ duration: 0.8 }}
-      >
-        {/* Conteúdo do Einstein */}
-      </motion.div>
-    )}
-  </AnimatePresence>
-
-  <AnimatePresence>
-    {mostrarBalaoFinal && (
-      <motion.div 
-        className="speech-bubble-final"
-        onClick={() => { 
-          setMostrarEinsteinFinal(false); 
-          setMostrarBalaoFinal(false); 
-          setMostrarEpílogo(false); 
-          // Aumentar o delay para permitir a transição completa
-          setTimeout(() => iniciarDesabamento(), 1400); // 1400ms para dar tempo da animação de 1.2s completar
-        }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ 
-          opacity: 0, 
-          y: -20,
-          transition: { 
-            duration: 1.2, // Aumentado para transição mais suave
-            ease: "easeInOut" 
-          }
-        }}
-        transition={{ duration: 0.8 }}
-      >
-        {fraseFinal}
-      </motion.div>
-    )}
-  </AnimatePresence>
-
-  <AnimatePresence>
-    {balaoAtivo && (
-       <motion.div
-        ref={bubbleRef}
-        className={`speech-bubble ${isBubbleFadingOut ? 'fade-out' : 'active'}`}
-        style={{
-            '--arrow-left': balaoAtivo.arrowLeft,
-        }}
-        initial={{ opacity: 0, y: 1 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 1, transition: { duration: FADE_OUT_DURATION_MS / 1200 }, delay: 0,  ease: "easeOut" }} 
-        transition={{ duration: FADE_IN_DURATION_MS / 800, delay: 0, ease: "easeOut" }}
-        onClick={handleBubbleClick}
-        >
-          <p>{balaoAtivo.frase}</p>
-        </motion.div>
-    )}
-  </AnimatePresence>
-</div>
-
-{/* SEÇÃO DOS BOTÕES - Usando apenas Framer Motion */}
-<motion.div 
-  layout
-  animate={{
-    y: balaoAtivo ? 69 : 0, // Movimento vertical
-  }}
-  transition={{
-    // Configurações específicas para o movimento y
-    y: {
-      type: "spring",
-      stiffness: 30,  // ⬆️ Aumentar = mais rápido
-      damping: 10, // ⬆️ Aumentar = menos oscilação
-      duration: 4,
-    },
-    // Configurações para layout (quando elementos aparecem/desaparecem)
-    layout: {
-      type: "spring",
-      stiffness: 85,
-      damping: 15,
-      duration: 1.5,
-    }
-  }}
-  className={`flex flex-col items-center gap-2 mb-6 mt-2`} // Remover layout-shift-container
->
-  {/* Seu conteúdo dos botões aqui */}
-  <div className="flex w-full gap-2.5 sm:gap-3.4">
-    <motion.button
-      layout
-      transition={{ 
-        layout: { 
-          type: "spring", 
-          stiffness: 85, 
-          damping: 15, 
-          duration: 1 
-        } 
-      }}
-      onClick={verificar}
-      disabled={selecionadas.length !== 4 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando}
-      className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect 
-        ${(selecionadas.length === 4 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 
-          'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} 
-          sm:px-7 sm:py-3 sm:text-lg`}
-    >
-      Verificar
-    </motion.button>
-    
-    <motion.button
-      layout
-      transition={{ 
-        layout: { 
-          type: "spring", 
-          stiffness: 85, 
-          damping: 15, 
-          duration: 1 
-        } 
-      }}
-      onClick={handleLimpar}
-      disabled={selecionadas.length === 0 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando || mostrarMensagemMotivacao}
-      className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect ${(selecionadas.length > 0 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 
-        'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
-    >
-      Limpar
-    </motion.button>
-  </div>
-
-  {/* LINHA 2: Embaralhar e Agrupar */}
-  <div className="flex w-full gap-2.5 sm:gap-3.4">
-    <motion.button
-      layout
-      transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
-      onClick={embaralhar}
-      disabled={embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || agrupando}
-      className={`w-full px-5 py-2 text-base bg-white text-gray-900 border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${(!embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gray-100' : ''}`}
-    >
-      Embaralhar
-    </motion.button>
-
-    <motion.button
-      layout
-      transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
-      onClick={handleAgrupar}
-      disabled={selecionadas.length < 2 || agrupando || embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao}
-      className={`w-full px-5 py-2 text-base bg-white text-gray-900 border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${(!embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao && selecionadas.length >= 2) ? 'hover:bg-gray-100' : ''}`}
-    >
-      Agrupar
-    </motion.button>
-  </div>
-
-  {/* LINHA 3: Motivação */}
-  <motion.button
-    layout
-    transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
-    onClick={handleMotivacao}
-    disabled={jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || embaralhando || agrupando}
-    className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect ${(!jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
-  >
-    Motivação
-  </motion.button>
-</motion.div>
- <div className="mt-6 pt-4 border-t-2 border-gray-200">
-        <h2 className="text-l font-bold text-center mb-4 text-gray-700 tracking-wider">
-          QUADRO DE VENCEDORES
-        </h2>
-        {vencedores.length > 0 ? (
-<ul className="space-y-2 max-h-48 overflow-y-auto p-4 bg-gray-50/90 backdrop-blur-sm shadow-xl border border-gray-200/50 ring-1 ring-gray-100/50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-{vencedores.slice().reverse().map((vencedor, index) => (
-<li key={index} className="flex justify-between items-center bg-white p-1.5 shadow-sm animate-fade-in border border-gray-300">
-                        <span className="font-semibold text-sm text-gray-800">{vencedor.nome}</span>
-                        <span className="text-sm text-gray-700">{vencedor.data}</span>
-                    </li>
+                      initial={{ opacity: 1, scale: 1 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.2, rotate: 100, transition: { duration: 1.4 } }}
+                      transition={{ layout: { type: "spring", stiffness: 159, damping: 72 } }}
+                      onClick={() => handleEinsteinClick(originalIndex)}
+                    >
+                      <img
+                        src="/einstein_final.png"
+                        alt="Vida"
+                        className="w-full h-full select-none hover:scale-[1.04]"
+                        loading="lazy"
+                      />
+                    </motion.div>
+                  )
                 ))}
-            </ul>
-        ) : (
-            <p className="text-center text-gray-500 italic mt-4">Ninguém venceu ainda. Seja o primeiro!</p>
-        )}
-    </div>
-    { }
+              </AnimatePresence>
 
-</main> 
+              <AnimatePresence>
+                {balaoAtivo && (
+                  <motion.div
+                    ref={bubbleRef}
+                    className={`speech-bubble ${isBubbleFadingOut ? 'fade-out' : 'active'}`}
+                    style={{
+                      '--arrow-left': balaoAtivo.arrowLeft,
+                    } as any}
 
-{/* =================================================================== */}
-<AnimatePresence>
-  {mostrarInputNome && (
-    <motion.div
-      className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-black/80 p-4"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-    >
-      <motion.div
-        initial={{ y: -50, scale: 0.9 }}
-        animate={{ y: 0, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 120, damping: 15 }}
-        className="w-full max-w-md"
-      >
-        {(() => {
-          const errosRealizados = 4 - vidas; // Calcula quantos erros foram feitos
-          const ranking = calcularRanking(errosRealizados);
-          
-          return (
-            <div className={`bg-white p-6 sm:p-8 shadow-xl text-center border-4 ${ranking.borderCor} ${ranking.bgCor}`}>
-              {/* Título de Parabéns */}
-      <motion.h2 
-  className="text-3xl sm:text-4xl font-extrabold mb-3 text-gray-800"
-  animate={{
-    scale: [1, 1.05, 1],
-  }}
-  transition={{
-    duration: 2,
-    repeat: Infinity,
-    ease: "easeInOut"
-  }}
->
-  VOCÊ VENCEU!
-</motion.h2>
-              
-              {/* Ranking */}
-              <motion.div 
-                className="mb-4"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
-                <h3 className={`text-[23px] sm:text-2xl font-bold ${ranking.cor} mb-1`}>
-                  {ranking.titulo}
-                </h3>
-                <p className={`text-sm ${ranking.cor} font-semibold mb-3`}>
-                  {ranking.subtitulo}
-                </p>
-                <p className="text-gray-700 text-[17px] sm:text-[10x] leading-relaxed mb-9">
-                  {ranking.descricao}
-                </p>
-              </motion.div>
-
-              {/* Formulário */}
-              <motion.form 
-                onSubmit={handleSalvarVencedor}
+                    initial={{ opacity: 0, y: 1 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 1, transition: { duration: FADE_OUT_DURATION_MS / 1200 } }}
+                    transition={{ duration: FADE_IN_DURATION_MS / 800, delay: 0, ease: "easeOut" }}
+                    onClick={handleBubbleClick}
+                  >
+                    <p>{balaoAtivo.frase}</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+          <AnimatePresence>
+            {mostrarBotaoFiquePorDentro && (
+              <motion.div
+                className="w-full sm:w-full mx-auto flex flex-col sm:flex-row justify-center gap-4 mt-1 -mb-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.6 }}
+                transition={{ duration: 1.2, ease: 'easeOut' }} // fade lento do container também (opcional)
               >
-                <p className="mb-4 text-gray-900 text-[17px] sm:text-[20px] ">
-                  Deixe sua marca no Quadro de Vencedores
-                </p>
-                <input
-                  type="text"
-                  value={nomeAtual}
-                  onChange={(e) => setNomeAtual(e.target.value)}
-                  className="w-full text-[13px] sm:text-[16px] border-2 border-gray-400 p-1 mb-4 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 transition-all duration-200"
-                  placeholder="Saindo do anonimato"
-                  maxLength={25}
-                  autoFocus
-                />
-                <button 
-                  type="submit" 
-                  className="w-full bg-gray-900 text-white px-6 py-3 font-bold hover:bg-gray-800 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!nomeAtual.trim()}
+                <motion.button
+                  key="fique-por-dentro"
+                  className={`w-full text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-gray-900 text-white transition-all duration-500 ease-in-out ${mostrarCaixaEmail ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                    }`}
+                  onClick={() => setMostrarCaixaEmail(true)}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  Entrar para a história
-                </button>
-              </motion.form>
-            </div>
-          );
-        })()}
-      </motion.div>
-    </motion.div>
-  )}
-</AnimatePresence>
+                  FIQUE POR DENTRO!
+                </motion.button>
+
+                <motion.button
+                  key="colaborador"
+                  className={`w-full text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-white text-gray-900 transition-all duration-500 ease-in-out ${mostrarCaixaColaborador ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                    }`}
+                  onClick={() => setMostrarCaixaColaborador(true)}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeOut' }}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  TORNE-SE UM COLABORADOR
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {!modoVisualFinal && mostrarBotoes && (
+              <motion.div
+                key="botoes"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: balaoAtivo ? 69 : 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{
+                  y: {
+                    type: "spring",
+                    stiffness: 30,
+                    damping: 10,
+                    duration: 0.6,
+                  },
+                  opacity: { duration: 0.5, ease: "easeInOut" },
+                  layout: {
+                    type: "spring",
+                    stiffness: 85,
+                    damping: 15,
+                    duration: 1.5,
+                  },
+                }}
+                className="flex flex-col items-center gap-2 mb-6 mt-2"
+              >
+
+                {/* LINHA 1: Embaralhar e Motivação */}
+                <div className="flex w-full gap-2.5 sm:gap-3.4">
+                  <motion.button
+                    layout
+                    transition={{
+                      type: "spring",
+                      stiffness: 85,
+                      damping: 15,
+                      duration: 1
+                    }}
+                    onClick={embaralhar}
+                    disabled={embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || agrupando}
+                    className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
+                  >
+                    Embaralhar
+                  </motion.button>
+
+                  <motion.button
+                    layout
+                    transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
+                    onClick={handleMotivacao}
+                    disabled={jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || embaralhando || agrupando}
+                    className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
+                  >
+                    Motivação
+                  </motion.button>
+                </div>
+
+                {/* LINHA 2: Limpar e Agrupar */}
+                <div className="flex w-full gap-2.5 sm:gap-3.4">
+                  <motion.button
+                    layout
+                    transition={{
+                      layout: {
+                        type: "spring",
+                        stiffness: 85,
+                        damping: 15,
+                        duration: 1
+                      }
+                    }}
+                    onClick={handleLimpar}
+                    disabled={selecionadas.length === 0 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando || mostrarMensagemMotivacao}
+                    className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length > 0 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
+                  >
+                    Limpar
+                  </motion.button>
+
+                  <motion.button
+                    layout
+                    transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
+                    onClick={handleAgrupar}
+                    disabled={selecionadas.length < 2 || agrupando || embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao}
+                    className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length >= 2 && !embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
+                  >
+                    Agrupar
+                  </motion.button>
+                </div>
+
+                {/* LINHA 3: Verificar */}
+                <motion.button
+                  layout
+                  transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
+                  onClick={verificar}
+                  disabled={selecionadas.length !== 4 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando}
+                  className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect 
+    ${selecionadas.length === 4 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ?
+                      'hover:bg-gradient-to-br hover:scale-[1.02] hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} 
+    sm:px-7 sm:py-3 sm:text-lg`}
+                >
+                  Verificar
+                </motion.button>
+                { }
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+
+          <motion.div
+            layout
+            animate={{ y: balaoAtivo ? 69 : 0, opacity: 1 }}
+            transition={{
+              y: {
+                type: "tween",
+                duration: 0.6,
+                ease: "easeInOut"
+              },
+              opacity: {
+                duration: 0.4
+              },
+              layout: {
+                duration: 0.6,
+                ease: "easeInOut"
+              }
+            }}
+
+            className="mt-6 pt-4 border-t-2 border-gray-200"
+          >
+
+            <h2 className="text-l font-bold text-center mb-4 text-gray-700 tracking-wider">
+
+              QUADRO DE VENCEDORES
+            </h2>
+            {vencedores.length > 0 ? (
+              <ul className="w-90 sm:w-137 space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-50/90 backdrop-blur-sm shadow-xl border border-gray-200/50 ring-1 ring-gray-100/50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                {vencedores.slice().reverse().map((vencedor: any, index) => {
+
+                  const ranking = calcularRanking(vencedor.erros || 0);
+                  return (
+                    <li key={index} className="bg-white shadow-sm animate-fade-in border border-gray-300 overflow-hidden hover:shadow-lg hover:scale-[1.02] hover:bg-gray-50 transition-all duration-300 ease-in-out cursor-pointer">
+                      <div className="flex items-center p-2">
+                        <div className={`w-2 h-8 rounded-r-md ${ranking.corBarra} mr-3 relative`}>
+
+                          {/* Ranking dentro da barra */}
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
+                              {ranking.nivel}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center flex-1">
+                          <span className="font-semibold text-sm text-gray-800" style={{ letterSpacing: '0.06em' }}>
+                            {vencedor.nome}
+                          </span>
+                          <span className="text-sm text-gray-700">{vencedor.data}</span>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="text-center text-gray-500 italic mt-4">Ninguém venceu ainda. Seja o primeiro!</p>
+            )}
+          </motion.div>
+
+        </main>
+      )}
+
+      {/* =================================================================== */}
+      <AnimatePresence>
+        {mostrarInputNome && (
+          <motion.div
+            className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-black/80 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <motion.div
+              initial={{
+                scale: 0.1,
+                borderRadius: '50%',
+                boxShadow: '0 0 0 rgba(255,255,255,0)',
+                rotate: 0,
+                x: 0,
+                y: 0
+
+              }}
+              animate={{
+                scale: 1,
+                borderRadius: '0.5rem',
+                boxShadow: '0 0 50px rgba(255,255,255,0.3)',
+                rotate: 0,
+                x: 0,
+                y: 0
+              }}
+              exit={{
+                scale: 0.01,
+                rotate: 1440, // 4 voltas
+                opacity: 0,
+                borderRadius: '50%',
+                boxShadow: '0 0 0 100px rgba(113, 59, 163, 0.5)',
+                filter: 'hue-rotate(360deg) brightness(4)',
+                overflow: 'hidden'
+              }}
+              transition={{
+                duration: 2,
+                ease: [0.4, 0, 0.2, 1]
+              }}
+              className="w-full max-w-md overflow: 'hidden' "
+            >
+              {(() => {
+                const errosRealizados = 4 - vidas;
+                const ranking = calcularRanking(errosRealizados);
+
+                return (
+                  // Adicionado "relative" para posicionar o botão 'X'
+                  <div className={`relative bg-white p-6 sm:p-8 shadow-xl text-center border-4 ${ranking.borderCor} ${ranking.bgCor}`}>
+
+                    {/* NOVO: Botão de fechar (X) */}
+                    <button
+                      onClick={handleFecharInputNome}
+                      className="absolute top-1 right-1 bg-gray-400 text-white hover:bg-gray-700 hover:scale-107 transition-all duration-200 z-10 shadow-lg hover:shadow-xl"
+                      aria-label="Fechar"
+                    >
+                      <svg
+                        className="w-4 h-4 -m-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={5}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                    {/* Título de Parabéns */}
+                    <motion.h2
+                      className="text-3xl sm:text-4xl font-extrabold mb-3 text-gray-800"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                    >
+                      VOCÊ VENCEU!
+                    </motion.h2>
+
+                    {/* Ranking */}
+                    <motion.div
+                      className="mb-4"
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 }}
+                    >
+                      <h3 className={`text-[23px] sm:text-2xl font-bold ${ranking.cor} mb-1`}>
+                        {ranking.titulo}
+                      </h3>
+                      <p className={`text-sm ${ranking.cor} font-semibold mb-3`}>
+                        {ranking.subtitulo}
+                      </p>
+                      <p className="text-gray-700 text-[17px] sm:text-[10x] leading-relaxed mb-9 text-justify">
+                        {ranking.descricao}
+                      </p>
+                    </motion.div>
+
+                    {/* Formulário */}
+                    <motion.form
+                      onSubmit={handleSalvarVencedor}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.6 }}
+                    >
+                      <p className="mb-4 text-gray-900 text-[17px] sm:text-[22px] ">
+                        Deixe sua marca no Quadro de Vencedores
+                      </p>
+                      <input
+                        type="text"
+                        value={nomeAtual}
+                        onChange={(e) => setNomeAtual(e.target.value)}
+                        className="w-full border-2 border-gray-400 p-3 mb-4 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 transition-all duration-200"
+                        style={{ fontSize: '16px' }}
+                        placeholder="Saindo do anonimato"
+                        maxLength={25}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
+                      />
+                      <button
+                        type="submit"
+                        className="w-full bg-gray-900 text-white px-6 py-3 font-bold hover:bg-gray-800 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={!nomeAtual.trim()}
+                      >
+                        Entrar para a história
+                      </button>
+                    </motion.form>
+                  </div>
+                );
+              })()}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* ADICIONE O CÓDIGO ABAIXO AQUI */}
+      <AnimatePresence>
+        {mostrarCaixaEmail && (
+          <CaixaNotificacaoEmail onClose={handleFecharCaixaEmail} />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mostrarCaixaColaborador && (
+          <CaixaColaborador onClose={() => setMostrarCaixaColaborador(false)} />
+        )}
+      </AnimatePresence>
+
     </>
-  )  }
+  )
+}
