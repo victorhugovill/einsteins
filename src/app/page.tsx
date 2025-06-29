@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '../lib/supabaseClient';
 import Image from 'next/image';
 
 // ========== DADOS DO JOGO ==========
 const Grupos = [
   { name: "Partes de uma calça", words: ["Bolso", "Gancho", "Cós", "Barra"] },
-  { name: "Cooletivos", words: ["Cardume", "Buquê", "Frota", "Molho"] },
+  { name: "Coletivos", words: ["Cardume", "Buquê", "Frota", "Molho"] },
   { name: "Palíndromos", words: ["Radar", "Osso", "Arara", "Reviver"] },
   { name: "Perfurantes", words: ["Agulha", "Prego", "Arpão", "Flecha"] }
 ]
@@ -277,9 +278,9 @@ const CaixaColaborador = ({ onClose }: any) => {
             type="submit"
             disabled={status === 'submitting' || !ideia}
             className={`w-full px-6 py-3 font-bold transition-all duration-300 disabled:opacity-60 ${status === 'success'
-                ? 'bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 text-white'
+              ? 'bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 text-white'
 
-                : 'bg-gray-800 text-white'
+              : 'bg-gray-800 text-white'
               }`}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -451,8 +452,8 @@ const CaixaNotificacaoEmail = ({ onClose }: any) => {
             type="submit"
             disabled={status === 'submitting' || !contact}
             className={`w-full px-6 py-3 font-bold transition-all duration-300 disabled:opacity-60 ${status === 'success'
-                ? 'bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 text-white'
-                : 'bg-gray-800 text-white'
+              ? 'bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 text-white'
+              : 'bg-gray-800 text-white'
               }`}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -575,18 +576,7 @@ export default function Home() {
 
   const [ordemOriginalEinsteins, setOrdemOriginalEinsteins] = useState<number[] | null>(null);
 
-  useEffect(() => {
-    const dados = {
-      vidas,
-      acertos,
-      palavrasAtivas,
-      palavrasExibidas,
-      shufflePressCount,
-      vidasOrdemExibição,
-    };
 
-    localStorage.setItem('einsteins_progressoAtual', JSON.stringify(dados));
-  }, [vidas, acertos, palavrasAtivas, palavrasExibidas, shufflePressCount, vidasOrdemExibição]);
 
   useEffect(() => {
     console.log("Estado de tituloAnimando mudou para:", tituloAnimando);
@@ -635,29 +625,24 @@ export default function Home() {
     return rankings[erros] || rankings[3]; // Se tiver mais de 3 erros, usa o último
   };
 
-  const registrarResultado = (vitoria: boolean, erros: number) => {
-    try {
-      const totalJogos = parseInt(localStorage.getItem('totalJogosEinsteins') || '0', 10) + 1;
-      localStorage.setItem('totalJogosEinsteins', totalJogos.toString());
+ const { data: estat, error: fetchError } = await supabase
+  .from('estatisticas')
+  .select('*')
+  .single();
 
-      if (vitoria) {
-        const vitorias = parseInt(localStorage.getItem('vitoriasEinsteins') || '0', 10) + 1;
-        localStorage.setItem('vitoriasEinsteins', vitorias.toString());
-
-        const ranking = calcularRanking(erros);
-        const rankingAtual = ranking.titulo;
-        const rankingsSalvos = JSON.parse(localStorage.getItem('rankingsEinsteins') || '{}');
-        rankingsSalvos[rankingAtual] = (rankingsSalvos[rankingAtual] || 0) + 1;
-        localStorage.setItem('rankingsEinsteins', JSON.stringify(rankingsSalvos));
-
-        setEstatisticas({ vitorias, totalJogos });
-      } else {
-        setEstatisticas(prev => ({ ...prev, totalJogos }));
-      }
-    } catch (error) {
-      console.error("Erro ao registrar resultado", error);
-    }
+if (!fetchError && estat) {
+  const novasEstat = {
+    total_jogos: estat.total_jogos + 1,
+    vitorias: estat.vitorias + (vitoria ? 1 : 0)
   };
+
+  const { error: updateError } = await supabase
+    .from('estatisticas')
+    .update(novasEstat)
+    .eq('id', estat.id);
+
+  if (updateError) console.error('Erro ao atualizar estatísticas:', updateError);
+}
 
   const handleClickEinstein10 = () => {
     setEinstein10Explodiu(true); // inicia "explosão"
@@ -1093,30 +1078,42 @@ export default function Home() {
     }
   }, [jogoPerdido, acertos, jogoGanho, registrarResultado]);
 
-  // Efeito para carregar os vencedores do localStorage ao iniciar
-  useEffect(() => {
-    try {
-      const dadosSalvos = localStorage.getItem('quadroVencedoresEinsteins');
-      if (dadosSalvos) {
-        setVencedores(JSON.parse(dadosSalvos));
-      }
-    } catch (error) {
-      console.error("Falha ao carregar vencedores do localStorage", error);
-    }
-  }, []); // Array vazio para executar apenas uma vez
+ 
+     const carregarDados = async () => {
+  const { data: vencedoresData, error: vencedoresError } = await supabase
+    .from('vencedores')
+    .select('*')
+    .order('data', { ascending: false });
 
-  // Efeito para salvar os vencedores no localStorage sempre que a lista for atualizada
-  useEffect(() => {
-    try {
-      // Não salva um array vazio no início, apenas após a primeira vitória
-      if (vencedores.length > 0) {
-        localStorage.setItem('quadroVencedoresEinsteins', JSON.stringify(vencedores));
-      }
-    } catch (error) {
-      console.error("Falha ao salvar vencedores no localStorage", error);
-    }
-  }, [vencedores]);
+  if (!vencedoresError) setVencedores(vencedoresData || []);
 
+  const { data: estatData, error: estatError } = await supabase
+    .from('estatisticas')
+    .select('*')
+    .single();
+
+  if (!estatError && estatData) {
+    setEstatisticas({
+      vitorias: estatData.vitorias,
+      totalJogos: estatData.total_jogos
+    });
+  }
+};
+
+useEffect(() => {
+  carregarDados();
+}, []);
+        
+       const { error } = await supabase
+  .from('vencedores')
+  .insert([{
+    nome: nomeAtual.trim(),
+    ranking: ranking.titulo,
+    erros: errosRealizados,
+    data: new Date().toISOString()
+  }]);
+
+if (error) console.error('Erro ao salvar vencedor no Supabase:', error);
 
   useEffect(() => {
     // Reset de todos os estados relacionados ao final quando o jogo reinicia
@@ -1406,650 +1403,648 @@ export default function Home() {
 
     };
 
-    setVencedores(prev => [...prev, novoVencedor]);
+    const { data, error } = await supabase
+      .from('vencedores')
+      .insert([
+        {
+          nome: nomeAtual.trim(),
+          ranking: ranking.titulo,
+          erros: errosRealizados,
+          data: new Date().toISOString()
+        }
+      ]);
 
-    setMostrarInputNome(false);
-    setNomeAtual('');
-    setMostrarBotoes(false);
-    setGridVisivel(false);
-    setVidas(0);
-    setModoVisualFinal(true);
-    setMostrarBotaoFiquePorDentro(true);
-
-    localStorage.setItem('einsteins_fimDeJogo', 'true');
-    localStorage.setItem('einsteins_acertos', JSON.stringify(acertos));
-    localStorage.setItem('einsteins_vidas', vidas.toString());
-    localStorage.removeItem('einsteins_progressoAtual');
-
-  };
-
-  const handleFecharTelaFinal = useCallback(() => {
-    // Apenas executa se o Einstein final estiver visível
-    if (mostrarEinsteinFinal) {
-      setMostrarEinsteinFinal(false);
-      setMostrarBalaoFinal(false);
-      setMostrarBotoes(false);
-
-      // ADICIONA UM DELAY DE 1 SEGUNDOS ANTES DE MOSTRAR A CAIXA
-      setTimeout(() => {
-        setModoVisualFinal(true);
-        setMostrarBotaoFiquePorDentro(true);
-
-      }, 1000); // 1 segundo após o einstein final desaparecer
+    if (error) {
+      console.error('Erro ao salvar vencedor no Supabase:', error);
     }
-  }, [mostrarEinsteinFinal]);
 
-  const handleFecharInputNome = () => {
-    setMostrarInputNome(false);
-    setNomeAtual('');
-    setMostrarBotoes(false);
-    setGridVisivel(false);
-    setVidas(0);
-    setModoVisualFinal(true);
-    setMostrarBotaoFiquePorDentro(true);
+    const handleFecharTelaFinal = useCallback(() => {
+      // Apenas executa se o Einstein final estiver visível
+      if (mostrarEinsteinFinal) {
+        setMostrarEinsteinFinal(false);
+        setMostrarBalaoFinal(false);
+        setMostrarBotoes(false);
 
-    // Salva o bloqueio do jogo
-    localStorage.setItem('einsteins_fimDeJogo', 'true');
-    localStorage.setItem('einsteins_acertos', JSON.stringify(acertos));
-    localStorage.setItem('einsteins_vidas', vidas.toString());
-  };
+        // ADICIONA UM DELAY DE 1 SEGUNDOS ANTES DE MOSTRAR A CAIXA
+        setTimeout(() => {
+          setModoVisualFinal(true);
+          setMostrarBotaoFiquePorDentro(true);
 
+        }, 1000); // 1 segundo após o einstein final desaparecer
+      }
+    }, [mostrarEinsteinFinal]);
 
-  // Função para controlar o fechamento da caixa de e-mail e o fluxo do jogo
-  const handleFecharCaixaEmail = () => {
-    setMostrarCaixaEmail(false);
-
-    // Se o jogo foi ganho, agora sim ativamos o modo visual final
-    if (jogoGanho) {
-      setJogoFinalizado(true);
-      localStorage.setItem('einsteins_fimDeJogo', 'true');
-
+    const handleFecharInputNome = () => {
+      setMostrarInputNome(false);
+      setNomeAtual('');
+      setMostrarBotoes(false);
+      setGridVisivel(false);
+      setVidas(0);
       setModoVisualFinal(true);
-      localStorage.setItem('einsteins_fimDeJogo', 'true');
+      setMostrarBotaoFiquePorDentro(true);
 
+      // Salva o bloqueio do jogo
+      localStorage.setItem('einsteins_fimDeJogo', 'true');
       localStorage.setItem('einsteins_acertos', JSON.stringify(acertos));
       localStorage.setItem('einsteins_vidas', vidas.toString());
-
-    }
-  };
-
-  const calcularDistribuicaoRanking = () => {
-    const dados = JSON.parse(localStorage.getItem('rankingsEinsteins') || '{}');
-    const totalJogos = parseInt(localStorage.getItem('totalJogosEinsteins') || '0', 10);
-    const totalVitorias:any = Object.values(dados).reduce((acc: any, val: any) => acc + val, 0);
-    const derrotas = Math.max(totalJogos - totalVitorias, 0);
-
-    const cores = {
-      "GENIAL": "#facc15",
-      "ADMIRÁVEL": "#38bdf8",
-      "PERSPICAZ": "#FB7185",
-      "INABALÁVEL": "#c084fc",
-      "DERROTA": "#606B7F"
     };
 
-    type Ranking = keyof typeof cores
 
-    const distribuicaoBase = [
-      ...Object.entries(dados).map(([ranking, qtd]: any) => ({
-        ranking,
-        cor: cores[ranking as Ranking] || "#d1d5db",
-        largura: totalJogos > 0 ? ((qtd / totalJogos) * 100).toFixed(2) : '0.00'
-      })),
-      {
-        ranking: "DERROTA",
-        cor: cores["DERROTA"],
-        largura: totalJogos > 0 ? ((derrotas / totalJogos) * 100).toFixed(2) : '0.00'
+    // Função para controlar o fechamento da caixa de e-mail e o fluxo do jogo
+    const handleFecharCaixaEmail = () => {
+      setMostrarCaixaEmail(false);
+
+      // Se o jogo foi ganho, agora sim ativamos o modo visual final
+      if (jogoGanho) {
+        setJogoFinalizado(true);
+        localStorage.setItem('einsteins_fimDeJogo', 'true');
+
+        setModoVisualFinal(true);
+        localStorage.setItem('einsteins_fimDeJogo', 'true');
+
+        localStorage.setItem('einsteins_acertos', JSON.stringify(acertos));
+        localStorage.setItem('einsteins_vidas', vidas.toString());
+
       }
-    ];
+    };
 
-    return distribuicaoBase;
-  };
-  // Efeito para mostrar o input de nome ao vencer
-  useEffect(() => {
-    if (jogoGanho && !processandoErro && !gameOverProcessedRef.current && !jogoTravadoCarregado) {
-      registrarResultado(true, 4 - vidas);
+    const calcularDistribuicaoRanking = () => {
+      const dados = JSON.parse(localStorage.getItem('rankingsEinsteins') || '{}');
+      const totalJogos = parseInt(localStorage.getItem('totalJogosEinsteins') || '0', 10);
+      const totalVitorias: any = Object.values(dados).reduce((acc: any, val: any) => acc + val, 0);
+      const derrotas = Math.max(totalJogos - totalVitorias, 0);
 
-      // Atraso para permitir que a última animação de acerto termine
-      setTimeout(() => {
-        setMostrarInputNome(true);
-      }, 1500);
-    }
-  }, [jogoGanho, processandoErro]);
-  const verificar = useCallback(() => {
-    if (jogoPerdido || jogoGanho || selecionadas.length !== 4 || processandoErro || mostrarMensagemMotivacao) return;
+      const cores = {
+        "GENIAL": "#facc15",
+        "ADMIRÁVEL": "#38bdf8",
+        "PERSPICAZ": "#FB7185",
+        "INABALÁVEL": "#c084fc",
+        "DERROTA": "#606B7F"
+      };
 
-    setMostrarMensagemMotivacao(false);
+      type Ranking = keyof typeof cores
 
-    // Verifica se o grupo está 100% correto (4 palavras certas)
-    const grupoCorreto = Grupos.find(group =>
-      selecionadas.filter(p => group.words.includes(p)).length === 4
-    );
+      const distribuicaoBase = [
+        ...Object.entries(dados).map(([ranking, qtd]: any) => ({
+          ranking,
+          cor: cores[ranking as Ranking] || "#d1d5db",
+          largura: totalJogos > 0 ? ((qtd / totalJogos) * 100).toFixed(2) : '0.00'
+        })),
+        {
+          ranking: "DERROTA",
+          cor: cores["DERROTA"],
+          largura: totalJogos > 0 ? ((derrotas / totalJogos) * 100).toFixed(2) : '0.00'
+        }
+      ];
 
-    // Verifica se o jogador acertou 3 palavras de um mesmo grupo
-    const grupoParcial = Grupos.find(group =>
-      selecionadas.filter(p => group.words.includes(p)).length === 3
-    );
+      return distribuicaoBase;
+    };
+    // Efeito para mostrar o input de nome ao vencer
+    useEffect(() => {
+      if (jogoGanho && !processandoErro && !gameOverProcessedRef.current && !jogoTravadoCarregado) {
+        registrarResultado(true, 4 - vidas);
 
-    // ========================== ACERTO COMPLETO (4 certas) ==========================
-    if (grupoCorreto && !acertos.some(a => a.name === grupoCorreto.name)) {
-      setProcessandoErro(true);
-      setPalavrasComAnimacaoSalto(selecionadas);
-      animarTitulo();
-
-      setTimeout(() => {
-        setPalavrasComAnimacaoSalto([]);
-        triggerBubbleVisualDisappearance();
-        setErroAtivo(false);
-        setPalavraTransitionStates(prevStates => {
-          const newStates = { ...prevStates };
-          grupoCorreto.words.forEach(word => {
-            newStates[word] = {
-              opacity: 0,
-              transform: 'scale(0.8)',
-              transitionDuration: 1000,
-              transitionDelay: 0,
-              transitionProperty: 'opacity, transform'
-            } as any;
-          });
-          return newStates;
-        });
+        // Atraso para permitir que a última animação de acerto termine
         setTimeout(() => {
-          setSelecionadas([]);
-          setAcertos(prev => [...prev, grupoCorreto]);
-          const newPalavrasAtivas = palavrasAtivas.filter(p => !grupoCorreto.words.includes(p));
-          setPalavrasAtivas(newPalavrasAtivas);
-          setPalavrasExibidas(shuffleArray(newPalavrasAtivas));
+          setMostrarInputNome(true);
+        }, 1500);
+      }
+    }, [jogoGanho, processandoErro]);
+    const verificar = useCallback(() => {
+      if (jogoPerdido || jogoGanho || selecionadas.length !== 4 || processandoErro || mostrarMensagemMotivacao) return;
 
+      setMostrarMensagemMotivacao(false);
+
+      // Verifica se o grupo está 100% correto (4 palavras certas)
+      const grupoCorreto = Grupos.find(group =>
+        selecionadas.filter(p => group.words.includes(p)).length === 4
+      );
+
+      // Verifica se o jogador acertou 3 palavras de um mesmo grupo
+      const grupoParcial = Grupos.find(group =>
+        selecionadas.filter(p => group.words.includes(p)).length === 3
+      );
+
+      // ========================== ACERTO COMPLETO (4 certas) ==========================
+      if (grupoCorreto && !acertos.some(a => a.name === grupoCorreto.name)) {
+        setProcessandoErro(true);
+        setPalavrasComAnimacaoSalto(selecionadas);
+        animarTitulo();
+
+        setTimeout(() => {
+          setPalavrasComAnimacaoSalto([]);
+          triggerBubbleVisualDisappearance();
+          setErroAtivo(false);
           setPalavraTransitionStates(prevStates => {
             const newStates = { ...prevStates };
-            grupoCorreto.words.forEach(word => delete newStates[word]);
-            newPalavrasAtivas.forEach(word => {
+            grupoCorreto.words.forEach(word => {
               newStates[word] = {
-                opacity: 1,
-                transform: 'scale(1)',
-                transitionDuration: 1200,
+                opacity: 0,
+                transform: 'scale(0.8)',
+                transitionDuration: 1000,
                 transitionDelay: 0,
                 transitionProperty: 'opacity, transform'
               } as any;
             });
             return newStates;
           });
-
-          setProcessandoErro(false);
-        }, 1000);
-      }, 1000);
-    }
-
-    // ===================== [NOVO BLOCO] DERROTA NA ÚLTIMA VIDA =====================
-    // Esta verificação agora tem prioridade sobre "quase acerto".
-    // Se não foi um acerto completo E a vida é 1, o jogo acaba aqui.
-    else if (vidas === 1) {
-      setProcessandoErro(true);
-      setErroAtivo(true); // Ativa o tremor
-
-      setTimeout(() => {
-        setErroAtivo(false); // Desativa o tremor
-
-        setTimeout(() => {
-          // Pega a função de perder vida que já criamos
-          const handleLifeLossAndUnlockButtons = () => {
-            const isLastLife = vidas === 1;
-            if (isLastLife) {
-              setIsAnimatingLastLife(true);
-            }
-            setVidas(prev => prev - 1);
-            setTimeout(() => {
-              if (isLastLife) {
-                setIsAnimatingLastLife(false);
-              } else {
-                setProcessandoErro(false);
-              }
-            }, 900);
-          };
-
-          // Lógica das frases especiais de última vida
-          const frasesUltimaVida = [
-            "Você deu o seu melhor, isso é o que importa.",
-            "Não deixe esse momento definir toda sua capacidade.",
-            "A vida é mesmo cheia de surpresas.",
-            "Clássico. Simplesmente clássico.",
-            "Bom, isso não saiu como planejado,não é mesmo?",
-            "Tem certeza que não foi de propósito?",
-            "A lei de Murphy em ação, pessoal.",
-            "O destino tem um senso de humor questionável.",
-            "Houston, we've had a problem.",
-            "Às vezes as coisas simplesmente acontecem.",
-            "Você realmente se superou aí.",
-            "Bem, isso esclarece algumas coisas."
-          ];
-          const fraseFinal = frasesUltimaVida[Math.floor(Math.random() * frasesUltimaVida.length)];
-
-          // Mostra o balão com a frase final e encerra o jogo
-          showBubble(fraseFinal, 0, '48%', handleLifeLossAndUnlockButtons);
-
-        }, 100);
-      }, TREMOR_DURATION_MS);
-    }
-
-    // ===================== QUASE ACERTO (3 palavras certas E vidas > 1) =====================
-    else if (grupoParcial) {
-      setProcessandoErro(true);
-      setErroAtivo(true);
-
-      setTimeout(() => {
-        setErroAtivo(false);
-
-        setTimeout(() => {
-          let proximaFilaFrases = [...frasesQuaseAcertoDisponiveis];
-          if (proximaFilaFrases.length === 0) {
-            proximaFilaFrases = shuffleArray([...frasesQuaseAcerto]);
-          }
-          const fraseParaExibir = proximaFilaFrases.shift()!;
-          setFrasesQuaseAcertoDisponiveis(proximaFilaFrases);
-
-          const indexDaVidaASumir = vidas - 1;
-
-          let arrowPosition: string;
-          switch (indexDaVidaASumir) {
-            case 3: arrowPosition = '83%'; break;
-            case 2: arrowPosition = '68.5%'; break;
-            case 1: arrowPosition = '56%'; break;
-            default: arrowPosition = '50%';
-          }
-
-          const handleLifeLossAndUnlockButtons = () => {
-            const isLastLife = vidas === 1;
-            if (isLastLife) {
-              setIsAnimatingLastLife(true);
-            }
-            setVidas(prev => prev - 1);
-            setTimeout(() => {
-              if (isLastLife) {
-                setIsAnimatingLastLife(false);
-              } else {
-                setProcessandoErro(false);
-              }
-            }, 900);
-          };
-
-          showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons);
-        }, 100);
-      }, TREMOR_DURATION_MS);
-    }
-
-    // ===================== ERRO COMUM (0-2 palavras certas E vidas > 1) =====================
-    else {
-      setProcessandoErro(true);
-      setErroAtivo(true);
-      setTimeout(() => {
-        setErroAtivo(false);
-
-        setTimeout(() => {
-          const indexDaVidaASumir = vidas - 1;
-          const handleLifeLossAndUnlockButtons = () => {
-            const isLastLife = vidas === 1;
-            if (isLastLife) {
-              setIsAnimatingLastLife(true);
-            }
-            setVidas(prev => prev - 1);
-            setTimeout(() => {
-              if (isLastLife) {
-                setIsAnimatingLastLife(false);
-              } else {
-                setProcessandoErro(false); // 
-              }
-            }, 900);
-          };
-
-          // ===== NOVA LÓGICA =====
-          // Se for a primeira vida perdida (vidas ainda é 4), apenas perde a vida sem mostrar o balão.
-          if (vidas === 4) {
-            handleLifeLossAndUnlockButtons();
-          } else {
-            // Para as vidas subsequentes, mantém a lógica de mostrar o balão com probabilidade.
-            if (Math.random() < 0.60) { // 
-              let proximaFilaFrases = [...frasesErroDisponiveis];
-              if (proximaFilaFrases.length === 0) {
-                proximaFilaFrases = shuffleArray([...frasesErro]);
-              }
-              const fraseParaExibir = proximaFilaFrases.shift()!;
-              setFrasesErroDisponiveis(proximaFilaFrases);
-
-              let arrowPosition: string;
-              switch (indexDaVidaASumir) {
-                case 2: arrowPosition = '70.5%'; break;
-                case 1: arrowPosition = '57%'; break;
-                default: arrowPosition = '50%';
-              }
-              showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons); // 
-            } else {
-              handleLifeLossAndUnlockButtons();  // Perde vida sem balão
-            }
-          }
-        }, 100);
-      }, TREMOR_DURATION_MS);
-    }
-
-  }, [
-    jogoPerdido, jogoGanho, selecionadas, processandoErro, mostrarMensagemMotivacao,
-    acertos, palavrasAtivas, vidas,
-    frasesErroDisponiveis, frasesQuaseAcertoDisponiveis,
-    triggerBubbleVisualDisappearance, showBubble, animarTitulo
-  ]);
-
-  const embaralhar = useCallback(() => {
-    if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
-
-    // Batch de estados iniciais para reduzir re-renders
-    const updateInitialStates = () => {
-      setShufflePressCount(prev => {
-        const newCount = prev + 1;
-
-        const frase = fraseDeEmbaralharPorCount.get(newCount);
-        if (frase) {
           setTimeout(() => {
-            const { einsteinIndex, arrowPosition } = calcularPosicaoSeta(vidas, vidasOrdemExibição);
-            showBubble(frase, einsteinIndex, arrowPosition);
-          }, 4200);
-        }
+            setSelecionadas([]);
+            setAcertos(prev => [...prev, grupoCorreto]);
+            const newPalavrasAtivas = palavrasAtivas.filter(p => !grupoCorreto.words.includes(p));
+            setPalavrasAtivas(newPalavrasAtivas);
+            setPalavrasExibidas(shuffleArray(newPalavrasAtivas));
 
-        return newCount;
-      });
+            setPalavraTransitionStates(prevStates => {
+              const newStates = { ...prevStates };
+              grupoCorreto.words.forEach(word => delete newStates[word]);
+              newPalavrasAtivas.forEach(word => {
+                newStates[word] = {
+                  opacity: 1,
+                  transform: 'scale(1)',
+                  transitionDuration: 1200,
+                  transitionDelay: 0,
+                  transitionProperty: 'opacity, transform'
+                } as any;
+              });
+              return newStates;
+            });
 
-      setEmbaralhando(true);
+            setProcessandoErro(false);
+          }, 1000);
+        }, 1000);
+      }
+
+      // ===================== [NOVO BLOCO] DERROTA NA ÚLTIMA VIDA =====================
+      // Esta verificação agora tem prioridade sobre "quase acerto".
+      // Se não foi um acerto completo E a vida é 1, o jogo acaba aqui.
+      else if (vidas === 1) {
+        setProcessandoErro(true);
+        setErroAtivo(true); // Ativa o tremor
+
+        setTimeout(() => {
+          setErroAtivo(false); // Desativa o tremor
+
+          setTimeout(() => {
+            // Pega a função de perder vida que já criamos
+            const handleLifeLossAndUnlockButtons = () => {
+              const isLastLife = vidas === 1;
+              if (isLastLife) {
+                setIsAnimatingLastLife(true);
+              }
+              setVidas(prev => prev - 1);
+              setTimeout(() => {
+                if (isLastLife) {
+                  setIsAnimatingLastLife(false);
+                } else {
+                  setProcessandoErro(false);
+                }
+              }, 900);
+            };
+
+            // Lógica das frases especiais de última vida
+            const frasesUltimaVida = [
+              "Você deu o seu melhor, isso é o que importa.",
+              "Não deixe esse momento definir toda sua capacidade.",
+              "A vida é mesmo cheia de surpresas.",
+              "Clássico. Simplesmente clássico.",
+              "Bom, isso não saiu como planejado,não é mesmo?",
+              "Tem certeza que não foi de propósito?",
+              "A lei de Murphy em ação, pessoal.",
+              "O destino tem um senso de humor questionável.",
+              "Houston, we've had a problem.",
+              "Às vezes as coisas simplesmente acontecem.",
+              "Você realmente se superou aí.",
+              "Bem, isso esclarece algumas coisas."
+            ];
+            const fraseFinal = frasesUltimaVida[Math.floor(Math.random() * frasesUltimaVida.length)];
+
+            // Mostra o balão com a frase final e encerra o jogo
+            showBubble(fraseFinal, 0, '48%', handleLifeLossAndUnlockButtons);
+
+          }, 100);
+        }, TREMOR_DURATION_MS);
+      }
+
+      // ===================== QUASE ACERTO (3 palavras certas E vidas > 1) =====================
+      else if (grupoParcial) {
+        setProcessandoErro(true);
+        setErroAtivo(true);
+
+        setTimeout(() => {
+          setErroAtivo(false);
+
+          setTimeout(() => {
+            let proximaFilaFrases = [...frasesQuaseAcertoDisponiveis];
+            if (proximaFilaFrases.length === 0) {
+              proximaFilaFrases = shuffleArray([...frasesQuaseAcerto]);
+            }
+            const fraseParaExibir = proximaFilaFrases.shift()!;
+            setFrasesQuaseAcertoDisponiveis(proximaFilaFrases);
+
+            const indexDaVidaASumir = vidas - 1;
+
+            let arrowPosition: string;
+            switch (indexDaVidaASumir) {
+              case 3: arrowPosition = '83%'; break;
+              case 2: arrowPosition = '68.5%'; break;
+              case 1: arrowPosition = '56%'; break;
+              default: arrowPosition = '50%';
+            }
+
+            const handleLifeLossAndUnlockButtons = () => {
+              const isLastLife = vidas === 1;
+              if (isLastLife) {
+                setIsAnimatingLastLife(true);
+              }
+              setVidas(prev => prev - 1);
+              setTimeout(() => {
+                if (isLastLife) {
+                  setIsAnimatingLastLife(false);
+                } else {
+                  setProcessandoErro(false);
+                }
+              }, 900);
+            };
+
+            showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons);
+          }, 100);
+        }, TREMOR_DURATION_MS);
+      }
+
+      // ===================== ERRO COMUM (0-2 palavras certas E vidas > 1) =====================
+      else {
+        setProcessandoErro(true);
+        setErroAtivo(true);
+        setTimeout(() => {
+          setErroAtivo(false);
+
+          setTimeout(() => {
+            const indexDaVidaASumir = vidas - 1;
+            const handleLifeLossAndUnlockButtons = () => {
+              const isLastLife = vidas === 1;
+              if (isLastLife) {
+                setIsAnimatingLastLife(true);
+              }
+              setVidas(prev => prev - 1);
+              setTimeout(() => {
+                if (isLastLife) {
+                  setIsAnimatingLastLife(false);
+                } else {
+                  setProcessandoErro(false); // 
+                }
+              }, 900);
+            };
+
+            // ===== NOVA LÓGICA =====
+            // Se for a primeira vida perdida (vidas ainda é 4), apenas perde a vida sem mostrar o balão.
+            if (vidas === 4) {
+              handleLifeLossAndUnlockButtons();
+            } else {
+              // Para as vidas subsequentes, mantém a lógica de mostrar o balão com probabilidade.
+              if (Math.random() < 0.60) { // 
+                let proximaFilaFrases = [...frasesErroDisponiveis];
+                if (proximaFilaFrases.length === 0) {
+                  proximaFilaFrases = shuffleArray([...frasesErro]);
+                }
+                const fraseParaExibir = proximaFilaFrases.shift()!;
+                setFrasesErroDisponiveis(proximaFilaFrases);
+
+                let arrowPosition: string;
+                switch (indexDaVidaASumir) {
+                  case 2: arrowPosition = '70.5%'; break;
+                  case 1: arrowPosition = '57%'; break;
+                  default: arrowPosition = '50%';
+                }
+                showBubble(fraseParaExibir, indexDaVidaASumir, arrowPosition, handleLifeLossAndUnlockButtons); // 
+              } else {
+                handleLifeLossAndUnlockButtons();  // Perde vida sem balão
+              }
+            }
+          }, 100);
+        }, TREMOR_DURATION_MS);
+      }
+
+    }, [
+      jogoPerdido, jogoGanho, selecionadas, processandoErro, mostrarMensagemMotivacao,
+      acertos, palavrasAtivas, vidas,
+      frasesErroDisponiveis, frasesQuaseAcertoDisponiveis,
+      triggerBubbleVisualDisappearance, showBubble, animarTitulo
+    ]);
+
+    const embaralhar = useCallback(() => {
+      if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
+
+      // Batch de estados iniciais para reduzir re-renders
+      const updateInitialStates = () => {
+        setShufflePressCount(prev => {
+          const newCount = prev + 1;
+
+          const frase = fraseDeEmbaralharPorCount.get(newCount);
+          if (frase) {
+            setTimeout(() => {
+              const { einsteinIndex, arrowPosition } = calcularPosicaoSeta(vidas, vidasOrdemExibição);
+              showBubble(frase, einsteinIndex, arrowPosition);
+            }, 4200);
+          }
+
+          return newCount;
+        });
+
+        setEmbaralhando(true);
+        triggerBubbleVisualDisappearance();
+        setErroAtivo(false);
+      };
+
+      updateInitialStates();
+
+      // Sistema de sorteio para os Einsteins 
+      const einsteinWinChance = Math.random() < 0.65; // probabilidade dos einsteins embaralharem
+
+      const fadeOutDurationPerItem = 250;
+      const fadeInDurationPerItem = 300;
+      const maxRandomDelay = 450;
+
+      // Pré-computação de delays para melhor performance
+      const palavrasParaShuffle = [...palavrasExibidas];
+      const fadeOutDelays = palavrasParaShuffle.map(() => Math.random() * maxRandomDelay);
+      const maxOverallFadeOutDelay = Math.max(...fadeOutDelays.map(delay => delay + fadeOutDurationPerItem));
+
+      // As palavras sempre começam a embaralhar imediatamente
+      const fadeOutStates = gerarTransitionStates(palavrasParaShuffle, { opacity: 0, duration: fadeOutDurationPerItem }, i => fadeOutDelays[i]);
+      setPalavraTransitionStates(prev => ({ ...prev, ...fadeOutStates }));
+
+
+      setOrdemOriginalEinsteins([...vidasOrdemExibição]);
+
+      // Einstein shuffle com sorteio
+      if (einsteinWinChance) {
+        const einsteinShuffleDelay = Math.random() * (maxRandomDelay * 0.2);
+
+        setOrdemOriginalEinsteins([...vidasOrdemExibição]); // SALVA a ordem original
+
+        setTimeout(() => {
+          const novaOrdem = shuffleArray([...vidasOrdemExibição]);
+          setEinsteinOrder(novaOrdem);
+
+          // Embaralhar Einsteins: volta após 1 segundo
+          setTimeout(() => {
+            setEinsteinOrder(ordemOriginalEinsteins ?? [0, 1, 2, 3]);
+          }, 1000);
+        }, einsteinShuffleDelay);
+
+        setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
+      } else {
+        setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
+      }
+      // Função principal de reorganização (mantida igual)
+      function reorganizePalavras() {
+        const newPalavrasAtivas = [...palavrasAtivas];
+        const newPalavrasExibidasShuffled = shuffleArray(newPalavrasAtivas);
+
+        // Batch de atualizações
+        setPalavrasExibidas(newPalavrasExibidasShuffled);
+
+        // Estados iniciais otimizados
+        const initialFadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra) => {
+          acc[palavra] = { opacity: 0, transitionDelay: 0, transitionDuration: fadeInDurationPerItem };
+          return acc;
+        }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
+
+        setPalavraTransitionStates(initialFadeInStates);
+
+        // Fade-in otimizado
+        const fadeInDelays = newPalavrasExibidasShuffled.map(() => Math.random() * maxRandomDelay);
+        const maxOverallFadeInDelay = Math.max(...fadeInDelays.map(delay => delay + fadeInDurationPerItem));
+
+        const fadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra, index) => {
+          acc[palavra] = {
+            opacity: 1,
+            transitionDelay: fadeInDelays[index],
+            transitionDuration: fadeInDurationPerItem
+          };
+          return acc;
+        }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
+
+        requestAnimationFrame(() => {
+          setPalavraTransitionStates(prev => ({ ...prev, ...fadeInStates }));
+        });
+
+        // Cleanup final otimizado
+        setTimeout(() => {
+          // Batch de operações finais
+          setEmbaralhando(false);
+          setSelecionadas(prev => prev.filter(p => newPalavrasExibidasShuffled.includes(p)));
+
+          setPalavraTransitionStates(prevStates => {
+            const optimizedStates = { ...prevStates };
+            Object.keys(optimizedStates).forEach(word => {
+              optimizedStates[word] = {
+                ...optimizedStates[word],
+                transitionDelay: 0,
+                transitionDuration: 400
+              };
+            });
+            return optimizedStates;
+          });
+        }, maxOverallFadeOutDelay + maxOverallFadeInDelay + 100);
+      }
+
+    }, [
+      jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
+      triggerBubbleVisualDisappearance, palavrasExibidas, palavrasAtivas,
+      showBubble, vidas, vidasOrdemExibição, ordemOriginalEinsteins
+    ]);
+
+    const handleMotivacao = useCallback(() => {
+      if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
+
+      setProcessandoErro(true);
       triggerBubbleVisualDisappearance();
       setErroAtivo(false);
+
+      setGridTransitionClass('grid-fade-out');
+      const fraseAleatoria = frasesMotivacionais[Math.floor(Math.random() * frasesMotivacionais.length)];
+      setMensagemMotivacionalAtual(fraseAleatoria);
+
+      setTimeout(() => {
+        setGridVisivel(false);
+        setMostrarMensagemMotivacao(true);
+        requestAnimationFrame(() => {
+          setMessageTransitionClass('fade-in');
+        });
+      }, MOTIVATION_TRANSITION_DURATION);
+    }, [
+      jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
+      triggerBubbleVisualDisappearance,
+    ]);
+
+    const handleClickMensagemMotivacao = useCallback(() => {
+      setMessageTransitionClass('fade-out');
+
+      setTimeout(() => {
+        setMostrarMensagemMotivacao(false);
+        setMensagemMotivacionalAtual('');
+        setGridVisivel(true);
+        setGridTransitionClass('grid-fade-out');
+        requestAnimationFrame(() => {
+          setGridTransitionClass('grid-fade-in');
+          setProcessandoErro(false);
+        });
+      }, MOTIVATION_TRANSITION_DURATION);
+    }, []);
+
+    const menuItemVariants = {
+      hidden: { opacity: 0, y: 20 },
+      visible: {
+        opacity: 1,
+        y: 0,
+        transition: { type: 'spring', stiffness: 100 },
+      },
+      exit: {
+        opacity: 0,
+        y: -20, // Move para cima ao sair
+      }
     };
 
-    updateInitialStates();
-
-    // Sistema de sorteio para os Einsteins 
-    const einsteinWinChance = Math.random() < 0.65; // probabilidade dos einsteins embaralharem
-
-    const fadeOutDurationPerItem = 250;
-    const fadeInDurationPerItem = 300;
-    const maxRandomDelay = 450;
-
-    // Pré-computação de delays para melhor performance
-    const palavrasParaShuffle = [...palavrasExibidas];
-    const fadeOutDelays = palavrasParaShuffle.map(() => Math.random() * maxRandomDelay);
-    const maxOverallFadeOutDelay = Math.max(...fadeOutDelays.map(delay => delay + fadeOutDurationPerItem));
-
-    // As palavras sempre começam a embaralhar imediatamente
-    const fadeOutStates = gerarTransitionStates(palavrasParaShuffle, { opacity: 0, duration: fadeOutDurationPerItem }, i => fadeOutDelays[i]);
-    setPalavraTransitionStates(prev => ({ ...prev, ...fadeOutStates }));
-
-
-    setOrdemOriginalEinsteins([...vidasOrdemExibição]);
-
-    // Einstein shuffle com sorteio
-    if (einsteinWinChance) {
-      const einsteinShuffleDelay = Math.random() * (maxRandomDelay * 0.2);
-
-      setOrdemOriginalEinsteins([...vidasOrdemExibição]); // SALVA a ordem original
-
-      setTimeout(() => {
-        const novaOrdem = shuffleArray([...vidasOrdemExibição]);
-        setEinsteinOrder(novaOrdem);
-
-        // Embaralhar Einsteins: volta após 1 segundo
-        setTimeout(() => {
-          setEinsteinOrder(ordemOriginalEinsteins ?? [0, 1, 2, 3]);
-        }, 1000);
-      }, einsteinShuffleDelay);
-
-      setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
-    } else {
-      setTimeout(reorganizePalavras, maxOverallFadeOutDelay + 50);
-    }
-    // Função principal de reorganização (mantida igual)
-    function reorganizePalavras() {
-      const newPalavrasAtivas = [...palavrasAtivas];
-      const newPalavrasExibidasShuffled = shuffleArray(newPalavrasAtivas);
-
-      // Batch de atualizações
-      setPalavrasExibidas(newPalavrasExibidasShuffled);
-
-      // Estados iniciais otimizados
-      const initialFadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra) => {
-        acc[palavra] = { opacity: 0, transitionDelay: 0, transitionDuration: fadeInDurationPerItem };
-        return acc;
-      }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
-
-      setPalavraTransitionStates(initialFadeInStates);
-
-      // Fade-in otimizado
-      const fadeInDelays = newPalavrasExibidasShuffled.map(() => Math.random() * maxRandomDelay);
-      const maxOverallFadeInDelay = Math.max(...fadeInDelays.map(delay => delay + fadeInDurationPerItem));
-
-      const fadeInStates = newPalavrasExibidasShuffled.reduce((acc, palavra, index) => {
-        acc[palavra] = {
-          opacity: 1,
-          transitionDelay: fadeInDelays[index],
-          transitionDuration: fadeInDurationPerItem
-        };
-        return acc;
-      }, {} as Record<string, { opacity: number, transitionDelay: number, transitionDuration: number }>);
-
+    const animarWaveMenu = (comDelay = false) => {
+      setWaveMenuAtivo(false);
       requestAnimationFrame(() => {
-        setPalavraTransitionStates(prev => ({ ...prev, ...fadeInStates }));
+        setWaveDelayAtivo(comDelay);
+        setWaveMenuAtivo(true);
       });
+    };
 
-      // Cleanup final otimizado
-      setTimeout(() => {
-        // Batch de operações finais
-        setEmbaralhando(false);
-        setSelecionadas(prev => prev.filter(p => newPalavrasExibidasShuffled.includes(p)));
+    useEffect(() => {
+      if (mostrarMenuInicial) {
+        animarWaveMenu(true); // ativa com delay na primeira vez
+      }
+    }, [mostrarMenuInicial]);
 
-        setPalavraTransitionStates(prevStates => {
-          const optimizedStates = { ...prevStates };
-          Object.keys(optimizedStates).forEach(word => {
-            optimizedStates[word] = {
-              ...optimizedStates[word],
-              transitionDelay: 0,
-              transitionDuration: 400
-            };
-          });
-          return optimizedStates;
-        });
-      }, maxOverallFadeOutDelay + maxOverallFadeInDelay + 100);
-    }
+    return (
+      <>
 
-  }, [
-    jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
-    triggerBubbleVisualDisappearance, palavrasExibidas, palavrasAtivas,
-    showBubble, vidas, vidasOrdemExibição, ordemOriginalEinsteins
-  ]);
-
-  const handleMotivacao = useCallback(() => {
-    if (jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao) return;
-
-    setProcessandoErro(true);
-    triggerBubbleVisualDisappearance();
-    setErroAtivo(false);
-
-    setGridTransitionClass('grid-fade-out');
-    const fraseAleatoria = frasesMotivacionais[Math.floor(Math.random() * frasesMotivacionais.length)];
-    setMensagemMotivacionalAtual(fraseAleatoria);
-
-    setTimeout(() => {
-      setGridVisivel(false);
-      setMostrarMensagemMotivacao(true);
-      requestAnimationFrame(() => {
-        setMessageTransitionClass('fade-in');
-      });
-    }, MOTIVATION_TRANSITION_DURATION);
-  }, [
-    jogoPerdido, jogoGanho, processandoErro, mostrarMensagemMotivacao,
-    triggerBubbleVisualDisappearance,
-  ]);
-
-  const handleClickMensagemMotivacao = useCallback(() => {
-    setMessageTransitionClass('fade-out');
-
-    setTimeout(() => {
-      setMostrarMensagemMotivacao(false);
-      setMensagemMotivacionalAtual('');
-      setGridVisivel(true);
-      setGridTransitionClass('grid-fade-out');
-      requestAnimationFrame(() => {
-        setGridTransitionClass('grid-fade-in');
-        setProcessandoErro(false);
-      });
-    }, MOTIVATION_TRANSITION_DURATION);
-  }, []);
-
-  const menuItemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { type: 'spring', stiffness: 100 },
-    },
-    exit: {
-      opacity: 0,
-      y: -20, // Move para cima ao sair
-    }
-  };
-
-  const animarWaveMenu = (comDelay = false) => {
-    setWaveMenuAtivo(false);
-    requestAnimationFrame(() => {
-      setWaveDelayAtivo(comDelay);
-      setWaveMenuAtivo(true);
-    });
-  };
-
-  useEffect(() => {
-    if (mostrarMenuInicial) {
-      animarWaveMenu(true); // ativa com delay na primeira vez
-    }
-  }, [mostrarMenuInicial]);
-
-  return (
-    <>
-
-      {/* ========== MENU INICIAL ========== */}
-      <AnimatePresence>
-        {mostrarMenuInicial && (
-          <motion.div
-            className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 px-4 py-8 text-center"
-            initial={{ opacity: 0, filter: "blur(8px)" }}
-            animate={{ opacity: 1, filter: "blur(0px)" }}
-            exit={{ opacity: 0, filter: "blur(5px)" }}
-            transition={{ duration: 1.5, ease: "easeInOut" }}
-          >
-            <motion.h1
-              className={`einsteins-title text-5xl font-bold tracking-widest mb-10 select-none ${waveMenuAtivo ? 'title-wave-animation' : ''}`}
-              variants={menuItemVariants}
-              onClick={() => animarWaveMenu(false)}
-            >
-              {"EINSTEINS".split("").map((letra, i) => (
-                <span
-                  key={i}
-                  className="letter inline-block"
-                  style={{ animationDelay: `${(waveDelayAtivo ? 1 : 0) + i * 0.1}s` }}
-                >
-                  {letra}
-                </span>
-              ))}
-            </motion.h1>
-
-            <motion.p
-              className="select-none text-lg bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold tracking-widest -mb-7 mt-2"
-              variants={menuItemVariants}
-            >
-              #01: o primeiro enigma
-            </motion.p>
-            <motion.button
-              onClick={handleIniciarJogo} // << ALTERE AQUI
-              className="w-full max-w-xs bg-gray-900 text-white px-6 py-3 font-bold mt-16 mb-4 border-2 border-gray-800 shadow transition-all duration-300"
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              variants={menuItemVariants}
-            >
-              JOGAR
-            </motion.button>
-
-            <motion.button
-              onClick={() => {
-
-                setMostrarComoJogar(true);
-              }}
-              className="select-none w-full max-w-xs bg-white text-gray-800 hover:scale-[1.03] px-6 py-3 font-semibold border-2 border-gray-800 hover:bg-gray-100 transition-all duration-300"
-              variants={menuItemVariants}
-            >
-              COMO JOGAR
-            </motion.button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ========== CAIXA COMO JOGAR ========== */}
-      <AnimatePresence>
-        {mostrarComoJogar && (
-          <motion.div
-            className="select-none fixed inset-0 flex items-center justify-center z-50 bg-white/55 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6, ease: "easeInOut" }}
-            onClick={() => {
-              setMostrarComoJogar(false);
-              setMostrarMenuInicial(true);
-            }}
-          >
+        {/* ========== MENU INICIAL ========== */}
+        <AnimatePresence>
+          {mostrarMenuInicial && (
             <motion.div
-              id="caixa-como-jogar"
-              className="relative bg-white p-6 sm:p-8 shadow-2xl text-center w-full max-w-lg overflow-visible z-10 2xl"
-              style={{
-                border: '5px solid transparent',
-                background:
-                  'linear-gradient(white, white) padding-box, linear-gradient(90deg, #7dd3fc, #fcd34d, #fda4af, #c4b5fd) border-box',
-                willChange: 'transform',
-              }}
-              initial={{ opacity: 1, scale: 0.01, rotate: 0 }}
-              animate={{ opacity: 1, scale: 1, rotate: 0 }}
-              exit={{ opacity: 0, scale: 0.01, rotate: 0, filter: "blur(10px)" }}
-              transition={{
-                type: "spring",
-                damping: 13,
-                stiffness: 100,
-                mass: 1.4,
-                duration: 3,
-              }}
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-white flex flex-col items-center justify-center z-50 px-4 py-8 text-center"
+              initial={{ opacity: 0, filter: "blur(8px)" }}
+              animate={{ opacity: 1, filter: "blur(0px)" }}
+              exit={{ opacity: 0, filter: "blur(5px)" }}
+              transition={{ duration: 1.5, ease: "easeInOut" }}
             >
-              <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold mb-4">COMO JOGAR</h2>
-              <p className="text-gray-700 mb-4 leading-relaxed text-lg">
-                Encontre <strong>grupos de 4 palavras</strong> que tenham algo em comum.
-              </p>
-              <ul className="text-center text-gray-600 space-y-12 mb-6 text-base">
-                Toque em <em>“Verificar”</em> para conferir se sua combinação está correta.
-              </ul>
-              <ul className="text-center text-gray-600 space-y-12 mb-6 text-base">
-                Você tem quatro chances para resolver o desafio.
-              </ul>
+              <motion.h1
+                className={`einsteins-title text-5xl font-bold tracking-widest mb-10 select-none ${waveMenuAtivo ? 'title-wave-animation' : ''}`}
+                variants={menuItemVariants}
+                onClick={() => animarWaveMenu(false)}
+              >
+                {"EINSTEINS".split("").map((letra, i) => (
+                  <span
+                    key={i}
+                    className="letter inline-block"
+                    style={{ animationDelay: `${(waveDelayAtivo ? 1 : 0) + i * 0.1}s` }}
+                  >
+                    {letra}
+                  </span>
+                ))}
+              </motion.h1>
+
+              <motion.p
+                className="select-none text-lg bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold tracking-widest -mb-7 mt-2"
+                variants={menuItemVariants}
+              >
+                #01: o primeiro enigma
+              </motion.p>
+              <motion.button
+                onClick={handleIniciarJogo} // << ALTERE AQUI
+                className="w-70 h-7 sm:w-70 bg-gray-900 text-white px-6 py-3 font-bold mt-16 mb-4 border-2 border-gray-200 shadow transition-all duration-300"
+                animate={{ scale: [1, 1.05, 1] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                variants={menuItemVariants}
+              >
+                JOGAR
+              </motion.button>
 
               <motion.button
                 onClick={() => {
-                  setMostrarComoJogar(false);
-                  setMostrarMenuInicial(false);
+
+                  setMostrarComoJogar(true);
                 }}
-                className="mt-4 mx-auto bg-gray-900 text-white px-6 py-3 font-bold md hover:scale-100 transition-transform"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                className="select-none sm:w-65 w-65 max-w-xs bg-white text-gray-800 hover:scale-[1.03] px-6 py-3 font-semibold border-2 border-gray-800 hover:bg-gray-100 transition-all duration-300"
+                variants={menuItemVariants}
               >
-                Entendi, vamos jogar!
+                COMO JOGAR
               </motion.button>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+
+        {/* ========== CAIXA COMO JOGAR ========== */}
+        <AnimatePresence>
+          {mostrarComoJogar && (
+            <motion.div
+              className="select-none fixed inset-0 flex items-center justify-center z-50 bg-white/55 p-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+              onClick={() => {
+                setMostrarComoJogar(false);
+                setMostrarMenuInicial(true);
+              }}
+            >
+              <motion.div
+                id="caixa-como-jogar"
+                className="relative bg-white p-6 sm:p-8 shadow-2xl text-center w-full max-w-lg overflow-visible z-10 2xl"
+                style={{
+                  border: '5px solid transparent',
+                  background:
+                    'linear-gradient(white, white) padding-box, linear-gradient(90deg, #7dd3fc, #fcd34d, #fda4af, #c4b5fd) border-box',
+                  willChange: 'transform',
+                }}
+                initial={{ opacity: 1, scale: 0.01, rotate: 0 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.01, rotate: 0, filter: "blur(10px)" }}
+                transition={{
+                  type: "spring",
+                  damping: 13,
+                  stiffness: 100,
+                  mass: 1.4,
+                  duration: 3,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <h2 className="text-3xl font-bold bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold mb-4">COMO JOGAR</h2>
+                <p className="text-gray-700 mb-4 leading-relaxed text-lg">
+                  Encontre <strong>grupos de 4 palavras</strong> que tenham algo em comum.
+                </p>
+                <ul className="text-center text-gray-600 space-y-12 mb-6 text-base">
+                  Toque em <em>“Verificar”</em> para conferir se sua combinação está correta.
+                </ul>
+                <ul className="text-center text-gray-600 space-y-12 mb-6 text-base">
+                  Você tem quatro chances para resolver o desafio.
+                </ul>
+
+                <motion.button
+                  onClick={() => {
+                    setMostrarComoJogar(false);
+                    setMostrarMenuInicial(false);
+                  }}
+                  className="mt-4 mx-auto bg-gray-900 text-white px-6 py-3 font-bold md hover:scale-100 transition-transform"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Entendi, vamos jogar!
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
 
 
-      <style jsx>{`
+        <style jsx>{`
   .btn-press-effect {
     transition: opacity 0.15s ease-in-out;
   }
@@ -2154,7 +2149,7 @@ css.theme-result-item {
 
 `}</style>
 
-      <style>{`
+        <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&display=swap');
         body { background:#f5f5f5; font-family:'Oswald',sans-serif; color:#1a1a1a; }
         button {
@@ -2263,6 +2258,33 @@ css.theme-result-item {
   /* Segundo pico, um pouco mais baixo para um efeito sutil */
   75% {
     transform: translateY(-7px);
+  }
+}
+
+@media (min-width: 481px) and (max-width: 639px) {
+  .einstein-clickable {
+    width: 6rem !important;  /* 80px */
+    height: 6rem !important; /* 80px */
+  }
+}
+
+@media (min-width: 481px) and (max-width: 639px) {
+  .linha-gradiente-ajustada {
+    width: 100% !important;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 639px) {
+  .quadro-vencedores-ajustado {
+    width: 95% !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+}
+
+ /* NOVA REGRA: para o espaçamento entre as vidas */
+  .layout-shift-container {
+    gap: 2rem !important; /* 16px */
   }
 }
 
@@ -2540,7 +2562,7 @@ css.theme-result-item {
 
 @media (min-width: 481px) and (max-width: 767px) {
   .einsteins-title {
-    font-size: clamp(3.7rem, 9vw, 4.2rem) !important;
+    font-size: clamp(3.6rem, 9vw, 4.2rem) !important;
     letter-spacing: 0.4em !important;
   }
 }
@@ -2640,1088 +2662,1088 @@ useEffect(() => {
 import { AnimatePresence } from 'framer-motion';
 
       `}</style>
-      <AnimatePresence>
-        {!mostrarMenuInicial && (
-          <motion.div
-            key="main-game-screen"
-            initial={{
-              opacity: 0,
-              y: -50,
-              scale: 0.15
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              scale: 1
-            }}
-            transition={{
-              duration: 2.1,
-              ease: [0.16, 1, 0.3, 1],
-              delay: 1.3
-            }}
-          >
-            {/* Container para o título fora do main */}
-            <div
-              className="title-container"
+        <AnimatePresence>
+          {!mostrarMenuInicial && (
+            <motion.div
+              key="main-game-screen"
+              initial={{
+                opacity: 0,
+                y: -50,
+                scale: 0.15
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1
+              }}
+              transition={{
+                duration: 2.1,
+                ease: [0.16, 1, 0.3, 1],
+                delay: 1.3
+              }}
             >
+              {/* Container para o título fora do main */}
+              <div
+                className="title-container"
+              >
+                {!mostrarMenuInicial && (
+                  <TituloAnimado tituloAnimando={tituloAnimando} onClick={animarTitulo} />
+                )}
+              </div>
+
+              {/* LINHA GRADIENTE */}
               {!mostrarMenuInicial && (
-                <TituloAnimado tituloAnimando={tituloAnimando} onClick={animarTitulo} />
+                <div className="linha-gradiente-ajustada h-[7px] w-[376px] sm:w-[576px] md:w-[576px] mx-auto -mt-0.5 mb-0 bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400" />
               )}
-            </div>
 
-            {/* LINHA GRADIENTE */}
-            {!mostrarMenuInicial && (
-              <div className="h-[7px] w-[376px] sm:w-[576px] md:w-[576px] mx-auto -mt-0.5 mb-0 bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400" />
-            )}
-
-            <AnimatePresence>
-              {mostrarEinsteinFinal && !epilogoEncerrado && (
-                <motion.div
-                  className="fixed inset-0 flex items-center justify-center z-50 bg-white/90 cursor-pointer p-4" // Added padding for safety
-                  initial={{ opacity: 0, y: 0 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{
-                    opacity: 0,
-                    scale: 1.2,
-                    filter: "blur(10px)",
-                    transition: {
-                      duration: 1.2, ease: "easeOut"
-                    } /* [cite: 396] */
-                  }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  onClick={handleFecharTelaFinal}
-                >
-
-                  {/* NEW: Wrapper for content alignment */}
-                  <div className="flex flex-col-reverse items-center justify-center gap-4">
-                    {/* Einstein (now first in markup but appears below balloon) */}
-                    <motion.img
-                      layout
-                      src="/einstein_final.png"
-                      alt="Einstein Final"
-                      className="w-34 sm:w-40 select-none pointer-events-none"
-                      initial={{ scale: 0.7 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 60, damping: 15 }}
-                    />
-
-                    {/* Balão */}
-                    {mostrarBalaoFinal && (
-                      <motion.div
-                        className="speech-bubble-final" // Removed mb-6
-                        initial={{ opacity: 0, filter: "blur(8px)", y: 20 }}
-                        animate={{
-                          opacity: 1, filter: "blur(0px)",
-                          y: 0
-                        }}
-                        exit={{ opacity: 0, filter: "blur(8px)", y: -10 }}
-                        transition={{
-                          duration: 1,
-                          ease: "easeOut",
-                          delay: 0.1
-                        }}
-                      >
-                        {fraseFinal}
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {!mostrarMenuInicial && (
-              <main ref={mainContainerRef} className="select-none p-4 max-w-xl mx-auto min-h-screen flex flex-col justify-start bg-white border border-gray-300 shadow-lg sm:p-6">
-
-
-                {/* BARRAS DE ACERTO */}
-                <div
-                  className="slect-none -mb-2 -mt-2 space-y-2 sm:-mb-0 sm:-mt-1 sm:space-y-2"
-                  style={{
-                    minHeight: `${acertos.length * 60}px`,
-                    transition: 'min-height 0.8s ease-out'
-                  }}
-                >
-                  {acertos.map((g: any, i) => {
-                    const cores = [
-                      'bg-sky-200 border-sky-400',
-                      'bg-amber-200 border-amber-400',
-                      'bg-rose-200 border-rose-400',
-                      'bg-purple-200 border-purple-400'
-                    ];
-
-                    const marginForLastItem = i === acertos.length - 1 ? ' mb-4 sm:mb-3' : '';
-
-                    // 🔧 CORREÇÃO PRINCIPAL: Usar as classes CSS corretas mesmo para grupos revelados
-                    const foiAcertoDoJogador = acertosOriginais.some(a => a.name === g.name);
-
-                    let classeDeFundo;
-                    if (jogoPerdido && !foiAcertoDoJogador) {
-                      // Se o grupo foi revelado no final, usar as classes CSS que foram definidas
-                      classeDeFundo = g.cssClasses ? `${g.cssClasses.bg} ${g.cssClasses.border}` : cores[i % cores.length];
-                    } else {
-                      // Acerto normal do jogador
-                      classeDeFundo = cores[i % cores.length];
-                    }
-
-                    return (
-                      <motion.div
-                        key={g.name}
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{
-                          scale: [1, 1.2, 0.8, 0],
-                          rotate: [0, 180, 360],
-                          opacity: [1, 1, 0],
-                          x: 0,
-                          y: 0,
-                        }}
-                        transition={{
-                          duration: 1.2,
-                          ease: "easeOut",
-                          delay: 0.3,
-                          type: "spring",
-                          damping: 40,
-                          stiffness: 80
-                        }}
-                        className={`p-2 border ${classeDeFundo} flex flex-col items-center text-center rounded${marginForLastItem}`}
-                      >
-                        <strong className="mb-1 text-sm sm:text-base font-bold">
-                          {g.name.toUpperCase()}
-                        </strong>
-                        <span className="text-xs sm:text-sm">
-                          {g.words.map((w: any) => w.toUpperCase()).join(', ')}
-                        </span>
-                      </motion.div>
-                    );
-                  })}
-                </div>
-
-
-                {gridVisivel && !jogoFinalizado && (
+              <AnimatePresence>
+                {mostrarEinsteinFinal && !epilogoEncerrado && (
                   <motion.div
-                    layout
-                    transition={{
-                      type: "spring",
-                      delay: 0,
-                      stiffness: 85,
-                      damping: 15,
-                      duration: 1,
-                      ease: "easeOut",
+                    className="fixed inset-0 flex items-center justify-center z-50 bg-white/90 cursor-pointer p-4" // Added padding for safety
+                    initial={{ opacity: 0, y: 0 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{
+                      opacity: 0,
+                      scale: 1.2,
+                      filter: "blur(10px)",
+                      transition: {
+                        duration: 1.2, ease: "easeOut"
+                      } /* [cite: 396] */
                     }}
-                    className={`grid grid-cols-4 mt-2.5 gap-2.5 mb-3 grid-transition sm:gap-3 sm:mb-5 sm:mt-0 ${gridTransitionClass}`}
-                    style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    onClick={handleFecharTelaFinal}
                   >
-                    {palavrasExibidas.map((palavra) => {
-                      const state = palavraTransitionStates[palavra] || defaultTransitionState;
-                      const shakeClass = tremorBotoesErro && selecionadas.includes(palavra) ? 'shake-animation' : '';
+
+                    {/* NEW: Wrapper for content alignment */}
+                    <div className="flex flex-col-reverse items-center justify-center gap-4">
+                      {/* Einstein (now first in markup but appears below balloon) */}
+                      <motion.img
+                        layout
+                        src="/einstein_final.png"
+                        alt="Einstein Final"
+                        className="w-34 sm:w-40 select-none pointer-events-none"
+                        initial={{ scale: 0.7 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 60, damping: 15 }}
+                      />
+
+                      {/* Balão */}
+                      {mostrarBalaoFinal && (
+                        <motion.div
+                          className="speech-bubble-final" // Removed mb-6
+                          initial={{ opacity: 0, filter: "blur(8px)", y: 20 }}
+                          animate={{
+                            opacity: 1, filter: "blur(0px)",
+                            y: 0
+                          }}
+                          exit={{ opacity: 0, filter: "blur(8px)", y: -10 }}
+                          transition={{
+                            duration: 1,
+                            ease: "easeOut",
+                            delay: 0.1
+                          }}
+                        >
+                          {fraseFinal}
+                        </motion.div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {!mostrarMenuInicial && (
+                <main ref={mainContainerRef} className="select-none p-4 max-w-xl mx-auto min-h-screen flex flex-col justify-start bg-white border border-gray-300 shadow-lg sm:p-6">
 
 
-                      // NOVO: Verifica se a palavra deve ter animação de salto
-                      const jumpClass = palavrasComAnimacaoSalto.includes(palavra)
-                        ? `word-jump-animation word-jump-delay-${(selecionadas.indexOf(palavra) % 4) + 1}`
-                        : '';
+                  {/* BARRAS DE ACERTO */}
+                  <div
+                    className="slect-none -mb-2 -mt-2 space-y-2 sm:-mb-0 sm:-mt-1 sm:space-y-2"
+                    style={{
+                      minHeight: `${acertos.length * 60}px`,
+                      transition: 'min-height 0.8s ease-out'
+                    }}
+                  >
+                    {acertos.map((g: any, i) => {
+                      const cores = [
+                        'bg-sky-200 border-sky-400',
+                        'bg-amber-200 border-amber-400',
+                        'bg-rose-200 border-rose-400',
+                        'bg-purple-200 border-purple-400'
+                      ];
+
+                      const marginForLastItem = i === acertos.length - 1 ? ' mb-4 sm:mb-3' : '';
+
+                      // 🔧 CORREÇÃO PRINCIPAL: Usar as classes CSS corretas mesmo para grupos revelados
+                      const foiAcertoDoJogador = acertosOriginais.some(a => a.name === g.name);
+
+                      let classeDeFundo;
+                      if (jogoPerdido && !foiAcertoDoJogador) {
+                        // Se o grupo foi revelado no final, usar as classes CSS que foram definidas
+                        classeDeFundo = g.cssClasses ? `${g.cssClasses.bg} ${g.cssClasses.border}` : cores[i % cores.length];
+                      } else {
+                        // Acerto normal do jogador
+                        classeDeFundo = cores[i % cores.length];
+                      }
 
                       return (
-                        <motion.button
-                          key={palavra}
-                          layout
-                          initial={{ opacity: 0, scale: 0.2 }}
-                          animate={{
-                            opacity: state.opacity, // CORRIGIDO: Obedece ao estado de opacidade
-                            scale: 1
+                        <motion.div
+                          key={g.name}
+                          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{
+                            scale: [1, 1.2, 0.8, 0],
+                            rotate: [0, 180, 360],
+                            opacity: [1, 1, 0],
+                            x: 0,
+                            y: 0,
                           }}
-                          exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.5 } }}
                           transition={{
+                            duration: 1.2,
+                            ease: "easeOut",
+                            delay: 0.3,
                             type: "spring",
-                            duration: 0.6,
-                            stiffness: 50,
-                            damping: 20,
-                            layout: {
-                              type: "spring",
-                              duration: 0.8,
-                              stiffness: 100,
-                              damping: 35,
-                            },
-                            opacity: {
-
-                              duration: (state.transitionDuration / 1000),
-                              delay: (state.transitionDelay / 1000),
-                              ease: "easeInOut"
-                            }
+                            damping: 40,
+                            stiffness: 80
                           }}
-                          onClick={() => cliquePalavras(palavra)}
-                          disabled={jogoPerdido || jogoGanho || !palavrasAtivas.includes(palavra) || processandoErro || embaralhando || mostrarMensagemMotivacao}
-                          className={`p-3 border-2 sm:border-8 shadow-lg text-xs hover:scale-[1.03]
+                          className={`p-2 border ${classeDeFundo} flex flex-col items-center text-center rounded${marginForLastItem}`}
+                        >
+                          <strong className="mb-1 text-sm sm:text-base font-bold">
+                            {g.name.toUpperCase()}
+                          </strong>
+                          <span className="text-xs sm:text-sm">
+                            {g.words.map((w: any) => w.toUpperCase()).join(', ')}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+
+
+                  {gridVisivel && !jogoFinalizado && (
+                    <motion.div
+                      layout
+                      transition={{
+                        type: "spring",
+                        delay: 0,
+                        stiffness: 85,
+                        damping: 15,
+                        duration: 1,
+                        ease: "easeOut",
+                      }}
+                      className={`grid grid-cols-4 mt-2.5 gap-2.5 mb-3 grid-transition sm:gap-3 sm:mb-5 sm:mt-0 ${gridTransitionClass}`}
+                      style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
+                    >
+                      {palavrasExibidas.map((palavra) => {
+                        const state = palavraTransitionStates[palavra] || defaultTransitionState;
+                        const shakeClass = tremorBotoesErro && selecionadas.includes(palavra) ? 'shake-animation' : '';
+
+
+                        // NOVO: Verifica se a palavra deve ter animação de salto
+                        const jumpClass = palavrasComAnimacaoSalto.includes(palavra)
+                          ? `word-jump-animation word-jump-delay-${(selecionadas.indexOf(palavra) % 4) + 1}`
+                          : '';
+
+                        return (
+                          <motion.button
+                            key={palavra}
+                            layout
+                            initial={{ opacity: 0, scale: 0.2 }}
+                            animate={{
+                              opacity: state.opacity, // CORRIGIDO: Obedece ao estado de opacidade
+                              scale: 1
+                            }}
+                            exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.5 } }}
+                            transition={{
+                              type: "spring",
+                              duration: 0.6,
+                              stiffness: 50,
+                              damping: 20,
+                              layout: {
+                                type: "spring",
+                                duration: 0.8,
+                                stiffness: 100,
+                                damping: 35,
+                              },
+                              opacity: {
+
+                                duration: (state.transitionDuration / 1000),
+                                delay: (state.transitionDelay / 1000),
+                                ease: "easeInOut"
+                              }
+                            }}
+                            onClick={() => cliquePalavras(palavra)}
+                            disabled={jogoPerdido || jogoGanho || !palavrasAtivas.includes(palavra) || processandoErro || embaralhando || mostrarMensagemMotivacao}
+                            className={`p-3 border-2 sm:border-8 shadow-lg text-xs hover:scale-[1.03]
     ${selecionadas.includes(palavra) ? 'bg-gray-900 text-gray-100 border-gray-800' : 'bg-white text-gray-900 border-gray-500 hover:bg-gray-100'}
     ${jogoPerdido && todasPalavrasDoJogo.includes(palavra) ? 'palavra-correta-perdeu' : ''}
     sm:p-4 sm:text-lg ${shakeClass} ${jumpClass}`}
-                        >
-                          {palavra}
-                        </motion.button>
-                      );
-                    })}
-                  </motion.div>
-                )}
+                          >
+                            {palavra}
+                          </motion.button>
+                        );
+                      })}
+                    </motion.div>
+                  )}
 
-                {mostrarMensagemMotivacao && (
-                  <div
-                    className={`motivation-message-container ${MotivacaoTransition}`}
-                    onClick={handleClickMensagemMotivacao}
-                    style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
-                  >
-                    <p className="motivation-message-text">{mensagemMotivacionalAtual}</p>
-                  </div>
-                )}
+                  {mostrarMensagemMotivacao && (
+                    <div
+                      className={`motivation-message-container ${MotivacaoTransition}`}
+                      onClick={handleClickMensagemMotivacao}
+                      style={{ '--motivation-transition-duration': `${MOTIVATION_TRANSITION_DURATION}ms` } as React.CSSProperties}
+                    >
+                      <p className="motivation-message-text">{mensagemMotivacionalAtual}</p>
+                    </div>
+                  )}
 
 
-                {!modoVisualFinal && (vidas > 0 || isAnimatingLastLife) && (
-                  <div
-                    ref={einsteinContainerRef}
-                    className={`flex justify-center items-center gap-3 mb-2 sm:gap-5 sm:mb-5 relative w-full layout-shift-container ${balaoAtivo ? 'layout-shift-down' : ''
-                      }`}
+                  {!modoVisualFinal && (vidas > 0 || isAnimatingLastLife) && (
+                    <div
+                      ref={einsteinContainerRef}
+                      className={`flex justify-center items-center gap-3 mb-2 sm:gap-5 sm:mb-5 relative w-full layout-shift-container ${balaoAtivo ? 'layout-shift-down' : ''
+                        }`}
 
-                  >
-                    {/* Seu código dos Einsteins aqui */}
-                    <AnimatePresence mode="popLayout">
-                      {vidasOrdemExibição.map((originalIndex) => (
-                        originalIndex < vidas && (
-                          <motion.div
-                            key={originalIndex}
-                            layoutId={`einstein-${originalIndex}`}
-                            ref={(el: any) => einsteinRefs.current[originalIndex] = el}
-                            className={`relative flex justify-center items-center w-16 h-16 sm:w-24 sm:h-24
+                    >
+                      {/* Seu código dos Einsteins aqui */}
+                      <AnimatePresence mode="popLayout">
+                        {vidasOrdemExibição.map((originalIndex) => (
+                          originalIndex < vidas && (
+                            <motion.div
+                              key={originalIndex}
+                              layoutId={`einstein-${originalIndex}`}
+                              ref={(el: any) => einsteinRefs.current[originalIndex] = el}
+                              className={`relative flex justify-center items-center w-16 h-16 sm:w-24 sm:h-24
             einstein-clickable
             ${einsteinAnimations[originalIndex] ? `einstein-${einsteinAnimations[originalIndex]}` : ''}
             ${einsteinClickCooldowns[originalIndex] ? 'einstein-cooldown' : ''}
             ${tremorBotoesErro ? 'shake-animation' : ''}
           `}
-                            initial={{ opacity: 1, scale: 1 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.2, rotate: 100, transition: { duration: 1.4 } }}
-                            transition={{ layout: { type: "spring", stiffness: 159, damping: 72 } }}
-                            onClick={() => handleEinsteinClick(originalIndex)}
+                              initial={{ opacity: 1, scale: 1 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.2, rotate: 100, transition: { duration: 1.4 } }}
+                              transition={{ layout: { type: "spring", stiffness: 159, damping: 72 } }}
+                              onClick={() => handleEinsteinClick(originalIndex)}
+                            >
+                              <img
+                                src="/einstein_final.png"
+                                alt="Vida"
+                                className="w-full h-full select-none hover:scale-[1.04]"
+                                loading="lazy"
+                              />
+                            </motion.div>
+                          )
+                        ))}
+                      </AnimatePresence>
+
+                      <AnimatePresence>
+                        {balaoAtivo && (
+                          <motion.div
+                            ref={bubbleRef}
+                            className={`speech-bubble ${isBubbleFadingOut ? 'fade-out' : 'active'}`}
+                            style={{
+                              '--arrow-left': balaoAtivo.arrowLeft,
+                            } as any}
+
+                            initial={{ opacity: 0, y: 1 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 1, transition: { duration: FADE_OUT_DURATION_MS / 1200 } }}
+                            transition={{ duration: FADE_IN_DURATION_MS / 800, delay: 0, ease: "easeOut" }}
+                            onClick={handleBubbleClick}
                           >
-                            <img
-                              src="/einstein_final.png"
-                              alt="Vida"
-                              className="w-full h-full select-none hover:scale-[1.04]"
-                              loading="lazy"
-                            />
+                            <p>{balaoAtivo.frase}</p>
                           </motion.div>
-                        )
-                      ))}
-                    </AnimatePresence>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
-                    <AnimatePresence>
-                      {balaoAtivo && (
-                        <motion.div
-                          ref={bubbleRef}
-                          className={`speech-bubble ${isBubbleFadingOut ? 'fade-out' : 'active'}`}
-                          style={{
-                            '--arrow-left': balaoAtivo.arrowLeft,
-                          } as any}
-
-                          initial={{ opacity: 0, y: 1 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 1, transition: { duration: FADE_OUT_DURATION_MS / 1200 } }}
-                          transition={{ duration: FADE_IN_DURATION_MS / 800, delay: 0, ease: "easeOut" }}
-                          onClick={handleBubbleClick}
-                        >
-                          <p>{balaoAtivo.frase}</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-
-                {modoVisualFinal && (
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      overflow: 'visible',
-                      zIndex: 1,
-                    }}
-                  >
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{
-                        opacity: 1,
-                      }}
-                      transition={{
-                        opacity: { duration: 1.5 }
-                      }}
-                      className="absolute pointer-events-none w-26 h-26 md:w-40 md:h-40"
+                  {modoVisualFinal && (
+                    <div
+                      className="absolute inset-0 pointer-events-none"
                       style={{
-                        left: 'calc(50vw - 64px)',
-                        top: 'calc(50vh - 64px)',
+                        overflow: 'visible',
+                        zIndex: 1,
                       }}
                     >
                       <motion.div
+                        initial={{ opacity: 0 }}
                         animate={{
-                          x: [
-                            0, 160, -110, 170, -50, 150, -130, 80, 160, -110,
-                            170, -70, 60, 150, -120, 90, -55, 140, -140, 85,
-                            -35, 160, -100, 70, 145, -80, 170, -65, 110, -130,
-                            75, 155, -85, 50, 140, -75, 165, -115, 80, 150, 140, -90,
-                            120, 80, 40, 10, 0
-                          ],
-
-                          y: [
-                            0, -80, -120, -60, -180, 160, 90, -200, -160, -40,
-                            20, 60, 120, 110, -60, 220, -60, -180, 260, 300,
-                            400, 360, 320, 280, 240, -120, -60, -180, -140, 200, 160, 120, 80, 40,
-                            -40, -80, -120, -160, -200, -200, -180, -140, -100, -60
-                          ],
-                          rotate: [
-                            0, 2, -1.5, 3, -2.5, 1.5, -2, 1, -1, 0.5, -0.5, 0
-                          ],
-                          scale: [
-                            1, 1.012, 1.025, 1.018, 1.03, 1.015, 1, 0.988, 0.995, 1.01, 0.98, 1
-                          ]
+                          opacity: 1,
                         }}
                         transition={{
-                          x: {
-                            duration: 95,
-                            repeat: Infinity,
-                            ease: [0.42, 0, 0.58, 1],
-                            repeatType: "loop"
-                          },
-                          y: {
-                            duration: 88,
-                            repeat: Infinity,
-                            ease: [0.42, 0, 0.58, 1],
-                            repeatType: "loop"
-                          },
-                          rotate: {
-                            duration: 120,
-                            repeat: Infinity,
-                            ease: [0.42, 0, 0.58, 1],
-                            repeatType: "loop"
-                          },
-                          scale: {
-                            duration: 100,
-                            repeat: Infinity,
-                            ease: [0.42, 0, 0.58, 1],
-                            repeatType: "loop"
-                          }
+                          opacity: { duration: 1.5 }
                         }}
-                        whileHover={{
-                          scale: 1.3,
-                          rotate: 0,
-                          transition: {
-                            duration: 2.5,
-                            ease: "easeOut"
-                          }
+                        className="absolute pointer-events-none w-26 h-26 md:w-40 md:h-40"
+                        style={{
+                          left: 'calc(50vw - 64px)',
+                          top: 'calc(50vh - 64px)',
                         }}
-                        whileTap={{
-                          scale: 0.9,
-                          rotate: 360,
-                          transition: {
-                            duration: 0.6,
-                            ease: "easeInOut"
-                          }
-                        }}
-                        onClick={handleClickEinsteinFlutuante}
-                        className="relative pointer-events-auto cursor-pointer"
                       >
                         <motion.div
                           animate={{
-                            zIndex: [10, 5, 50, 3, 60, 8, 70, 4, 90, 2]
+                            x: [
+                              0, 160, -110, 170, -50, 150, -130, 80, 160, -110,
+                              170, -70, 60, 150, -120, 90, -55, 140, -140, 85,
+                              -35, 160, -100, 70, 145, -80, 170, -65, 110, -130,
+                              75, 155, -85, 50, 140, -75, 165, -115, 80, 150, 140, -90,
+                              120, 80, 40, 10, 0
+                            ],
+
+                            y: [
+                              0, -80, -120, -60, -180, 160, 90, -200, -160, -40,
+                              20, 60, 120, 110, -60, 220, -60, -180, 260, 300,
+                              400, 360, 320, 280, 240, -120, -60, -180, -140, 200, 160, 120, 80, 40,
+                              -40, -80, -120, -160, -200, -200, -180, -140, -100, -60
+                            ],
+                            rotate: [
+                              0, 2, -1.5, 3, -2.5, 1.5, -2, 1, -1, 0.5, -0.5, 0
+                            ],
+                            scale: [
+                              1, 1.012, 1.025, 1.018, 1.03, 1.015, 1, 0.988, 0.995, 1.01, 0.98, 1
+                            ]
                           }}
                           transition={{
-                            zIndex: {
-                              duration: 40,
+                            x: {
+                              duration: 95,
                               repeat: Infinity,
+                              ease: [0.42, 0, 0.58, 1],
+                              repeatType: "loop"
+                            },
+                            y: {
+                              duration: 88,
+                              repeat: Infinity,
+                              ease: [0.42, 0, 0.58, 1],
+                              repeatType: "loop"
+                            },
+                            rotate: {
+                              duration: 120,
+                              repeat: Infinity,
+                              ease: [0.42, 0, 0.58, 1],
+                              repeatType: "loop"
+                            },
+                            scale: {
+                              duration: 100,
+                              repeat: Infinity,
+                              ease: [0.42, 0, 0.58, 1],
+                              repeatType: "loop"
+                            }
+                          }}
+                          whileHover={{
+                            scale: 1.3,
+                            rotate: 0,
+                            transition: {
+                              duration: 2.5,
+                              ease: "easeOut"
+                            }
+                          }}
+                          whileTap={{
+                            scale: 0.9,
+                            rotate: 360,
+                            transition: {
+                              duration: 0.6,
                               ease: "easeInOut"
                             }
                           }}
-                          className="relative select-none"
+                          onClick={handleClickEinsteinFlutuante}
+                          className="relative pointer-events-auto cursor-pointer"
                         >
                           <motion.div
                             animate={{
-                              filter: [
-                                "blur(0px) brightness(1)",
-                                "blur(1px) brightness(1.1)",
-                                "blur(0.5px) brightness(0.9)",
-                                "blur(1.5px) brightness(1.2)",
-                                "blur(0px) brightness(1)"
-                              ]
+                              zIndex: [10, 5, 50, 3, 60, 8, 70, 4, 90, 2]
                             }}
                             transition={{
-                              filter: {
-                                duration: 60,
+                              zIndex: {
+                                duration: 40,
                                 repeat: Infinity,
                                 ease: "easeInOut"
                               }
                             }}
+                            className="relative select-none"
                           >
+                            <motion.div
+                              animate={{
+                                filter: [
+                                  "blur(0px) brightness(1)",
+                                  "blur(1px) brightness(1.1)",
+                                  "blur(0.5px) brightness(0.9)",
+                                  "blur(1.5px) brightness(1.2)",
+                                  "blur(0px) brightness(1)"
+                                ]
+                              }}
+                              transition={{
+                                filter: {
+                                  duration: 60,
+                                  repeat: Infinity,
+                                  ease: "easeInOut"
+                                }
+                              }}
+                            >
+                            </motion.div>
+                            <Image
+                              src="/einstein_final.png"
+                              alt="Einstein pós"
+                              width={120}
+                              height={120}
+                              className="rounded-full pointer-events-none w-22 h-22 md:w-27 md:h-27"
+                              style={{ background: 'none' }}
+                            />
                           </motion.div>
-                          <Image
-                            src="/einstein_final.png"
-                            alt="Einstein pós"
-                            width={120}
-                            height={120}
-                            className="rounded-full pointer-events-none w-22 h-22 md:w-27 md:h-27"
-                            style={{ background: 'none' }}
-                          />
                         </motion.div>
                       </motion.div>
-                    </motion.div>
 
-                    {mostrarEinsteinFlutuante2 && (
-                      <motion.div
-                        initial={{ rotate: -180, scale: 0 }}
-                        animate={{
-                          rotate: 0,
-                          scale: 1,
-                          x: [0, -80, 10, 90, 87, -70, 12, 80, 93, 0, -10, -50, -90, 81, -50, 80, -80, 33, 0],
-                          y: [0, 100, 300, -160, 400, -120, 180, -60, 90, 0, 100, 300, -160, 400, -120, 180, -60, 90, 0]
-                        }}
-                        transition={{
-                          rotate: { duration: 0.8 },
-                          scale: { duration: 0.8 },
-                          x: { duration: 85, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 85, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
-                        style={{ left: 'calc(50% - 70px)', top: 'calc(50% - 60px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 2" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante3 && (
-                      <motion.div
-                        initial={{ scale: 0, y: -100 }}
-                        animate={{
-                          scale: 1,
-                          y: [0, -100, 300, -160, 400, 0, -100, 300, -160, 400, 0],
-                          x: [0, 94, -10, 81, -90, 87, -80, 29, -70, 0, 71, -40, 83, -90, 44, -80, 88, -70, 0],
-                        }}
-                        transition={{
-                          scale: { duration: 0.6 },
-                          x: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
-                          y: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
-                        style={{ left: 'calc(50% - 20px)', top: 'calc(50% - 50px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 3" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante4 && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0, rotate: 270 }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                          rotate: 0,
-                          x: [0, -78, 93, -60, 81, -90, 89, -80, 11, 0, -10, 16, -7, 14, 77, 45, -80, 10, 0],
-                          y: [0, -160, 400, 200, -100, 380, -90, 240, 300, 0, -160, 400, 200, -100, 380, -90, 240, 300, 0]
-                        }}
-                        transition={{
-                          opacity: { duration: 0.4 },
-                          scale: { duration: 0.6 },
-                          rotate: { duration: 0.6 },
-                          x: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
-                        style={{ left: 'calc(50% - 30px)', top: 'calc(50% + 10px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 4" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante5 && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{
-                          opacity: 1,
-                          scale: 1,
-                          x: [0, 79, -11, 29, 40, 45, -20, 40, -60, 0, 13, -10, 34, 44, 58, -70, 30, -60, 0],
-                          y: [0, 150, 300, -160, 400, 220, 170, 90, 200, 0, 150, 300, -160, 400, 220, 170, 90, 200, 0]
-                        }}
-                        transition={{
-                          opacity: { duration: 0.3 },
-                          scale: { duration: 0.5 },
-                          x: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
-                        style={{ left: 'calc(50% + 40px)', top: 'calc(50% - 70px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 5" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante6 && (
-                      <motion.div
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{
-                          scale: 1,
-                          rotate: 0,
-                          x: [0, -40, 39, -30, 10, -50, 60, 0, -10, 69, -60, 11, -80, 43, 0],
-                          y: [0, -160, 200, -140, 300, -100, 400, 0, -160, 200, -140, 300, -100, 400, 0]
-                        }}
-                        transition={{
-                          scale: { duration: 0.6 },
-                          rotate: { duration: 0.6 },
-                          x: { duration: 86, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 86, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
-                        style={{ left: 'calc(50% + 20px)', top: 'calc(50% + 50px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 6" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante7 && (
-                      <motion.div
-                        initial={{ scale: 0.5, rotate: -90 }}
-                        animate={{
-                          scale: 1,
-                          rotate: 0,
-                          x: [0, 20, -22, 39, -30, 20, -25, 33, 0, 40, -33, 36, -33, 40, -10, 43, 0],
-                          y: [0, -100, 180, -160, 300, -140, 250, -120, 0, -100, 180, -160, 300, -140, 250, -120, 0]
-                        }}
-                        transition={{
-                          scale: { duration: 0.7 },
-                          rotate: { duration: 0.6 },
-                          x: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
-                        style={{ left: 'calc(50% - 40px)', top: 'calc(50% + 60px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 7" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante8 && (
-                      <motion.div
-                        initial={{ scale: 0.2, opacity: 0 }}
-                        animate={{
-                          scale: 1,
-                          opacity: 1,
-                          x: [0, 30, 11, -10, 31, -20, 44, -50, 34, 0, -40, 32, -40, 35, -50, 44, -60, 43, 0],
-                          y: [0, 180, -160, 300, -140, 250, -120, 200, -100, 0, 180, -160, 300, -140, 250, -120, 200, -100, 0]
-                        }}
-                        transition={{
-                          scale: { duration: 0.8 },
-                          opacity: { duration: 0.6 },
-                          x: { duration: 92, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
-                          y: { duration: 92, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
-                        style={{ left: 'calc(50% + 40px)', top: 'calc(50% - 30px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 8" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    {mostrarEinsteinFlutuante9 && (
-                      <motion.div
-                        initial={{ scale: 0.3, rotate: 180 }}
-                        animate={{
-                          scale: 1,
-                          rotate: 0,
-                          x: [0, 51, -40, 40, -30, 52, -40, 42, 0, 44, -30, 13, -50, 23, -25, 55, 0],
-                          y: [0, -140, 300, -160, 280, -120, 240, -100, 0, -140, 300, -160, 280, -120, 240, -100, 0]
-                        }}
-                        transition={{
-                          scale: { duration: 0.7 },
-                          rotate: { duration: 0.7 },
-                          x: { duration: 94, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                          y: { duration: 94, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
-                        }}
-                        className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
-                        style={{ left: 'calc(50% + 20px)', top: 'calc(50% + 20px)' }}
-                      >
-                        <Image src="/einstein_final.png" alt="Einstein 9" width={120} height={120} className="rounded-full" />
-                      </motion.div>
-                    )}
-
-                    <AnimatePresence>
-                      {mostrarEinsteinFlutuante10 && !einstein10Explodiu && (
+                      {mostrarEinsteinFlutuante2 && (
                         <motion.div
-                          key="einstein10"
-                          initial={{ scale: 0, opacity: 0 }}
+                          initial={{ rotate: -180, scale: 0 }}
                           animate={{
-                            scale: 2,
-                            opacity: 1,
-                            x: [0, -10, 65, -70, 42, -40, 27, -10, 11, 0, -60, 32, -30, 44, -40, 31, -66, 44, 0],
-                            y: [0, 133, -130, 100, -120, 140, -140, 180, -90, 0, 50, -160, 400, -120, 240, -100, 180, -90, 0]
-                          }}
-                          exit={{
-                            y: 2500,
-                            rotate: 1080,
-                            scale: 0.1,
-                            transition: { duration: 1.7, ease: "easeIn" }
+                            rotate: 0,
+                            scale: 1,
+                            x: [0, -80, 10, 90, 87, -70, 12, 80, 93, 0, -10, -50, -90, 81, -50, 80, -80, 33, 0],
+                            y: [0, 100, 300, -160, 400, -120, 180, -60, 90, 0, 100, 300, -160, 400, -120, 180, -60, 90, 0]
                           }}
                           transition={{
-                            scale: { duration: 1.5 },
-                            opacity: { duration: 0.9 },
-                            x: { duration: 96, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
-                            y: { duration: 96, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                            rotate: { duration: 0.8 },
+                            scale: { duration: 0.8 },
+                            x: { duration: 85, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 85, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
                           }}
-                          onClick={handleClickEinstein10}
-                          className="absolute pointer-events-auto cursor-pointer w-22 h-22 md:w-45 md:h-45 sm:h-45 sm:w-45"
-                          style={{ left: 'calc(50% - 120px)', top: 'calc(50% - 90px)' }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
+                          style={{ left: 'calc(50% - 70px)', top: 'calc(50% - 60px)' }}
                         >
-                          <Image src="/einstein_final.png"
-                            alt="Einstein 10"
-                            width={120}
-                            height={120}
-                            className="select-none rounded-full"
-                            style={{
-                              userSelect: 'none',
-                              WebkitUserSelect: 'none',
-                              pointerEvents: 'none'
-                            }}
-                          />
+                          <Image src="/einstein_final.png" alt="Einstein 2" width={120} height={120} className="rounded-full" />
                         </motion.div>
                       )}
-                    </AnimatePresence>
-                  </div>
-                )}
 
-                <AnimatePresence>
-
-                  {mostrarBotaoFiquePorDentro && (
-                    <motion.div
-                      className="w-full sm:w-full mx-auto flex flex-col sm:flex-row justify-center gap-4 mt-1 mb-6"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 1.7, ease: "easeOut", delay: 0.5 }}
-                    >
-                      <motion.button
-                        key="fique-por-dentro"
-                        className={`select-none w-full text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-gray-900 text-white transition-all duration-500 ease-in-out ${mostrarCaixaEmail ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                          }`}
-                        onClick={() => setMostrarCaixaEmail(true)}
-                        initial={{ opacity: 1, y: 0 }}
-                        animate={{ scale: [1, 1.04, 1] }}
-                        transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        FIQUE POR DENTRO!
-                      </motion.button>
-
-                      <motion.button
-                        key="colaborador"
-                        className={`w-full select-none -mt-2 sm:mt-0 text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-white text-gray-900 transition-all duration-500 ease-in-out ${mostrarCaixaColaborador ? 'opacity-0 pointer-events-none' : 'opacity-100'
-                          }`}
-                        onClick={() => setMostrarCaixaColaborador(true)}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.1, ease: "easeOut" }}
-                        whileHover={{ scale: 1.04 }}
-                        whileTap={{ scale: 0.95 }}
-                      >
-                        COMPARTILHE SUAS IDEIAS
-                      </motion.button>
-
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                <AnimatePresence>
-                  {!modoVisualFinal && mostrarBotoes && (
-                    <motion.div
-                      key="botoes"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: balaoAtivo ? 69 : 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{
-                        y: {
-                          type: "spring",
-                          stiffness: 30,
-                          damping: 10,
-                          duration: 0.6,
-                        },
-                        opacity: { duration: 0.5, ease: "easeInOut" },
-                        layout: {
-                          type: "spring",
-                          stiffness: 85,
-                          damping: 15,
-                          duration: 1.5,
-                        },
-                      }}
-                      className="flex flex-col items-center gap-2 mb-6 mt-2"
-                    >
-
-                      {/* LINHA 1: Embaralhar e Motivação */}
-                      <div className="flex w-full gap-2.5 sm:gap-3.4">
-                        <motion.button
-                          layout
+                      {mostrarEinsteinFlutuante3 && (
+                        <motion.div
+                          initial={{ scale: 0, y: -100 }}
+                          animate={{
+                            scale: 1,
+                            y: [0, -100, 300, -160, 400, 0, -100, 300, -160, 400, 0],
+                            x: [0, 94, -10, 81, -90, 87, -80, 29, -70, 0, 71, -40, 83, -90, 44, -80, 88, -70, 0],
+                          }}
                           transition={{
+                            scale: { duration: 0.6 },
+                            x: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
+                            y: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
+                          style={{ left: 'calc(50% - 20px)', top: 'calc(50% - 50px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 3" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante4 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0, rotate: 270 }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            rotate: 0,
+                            x: [0, -78, 93, -60, 81, -90, 89, -80, 11, 0, -10, 16, -7, 14, 77, 45, -80, 10, 0],
+                            y: [0, -160, 400, 200, -100, 380, -90, 240, 300, 0, -160, 400, 200, -100, 380, -90, 240, 300, 0]
+                          }}
+                          transition={{
+                            opacity: { duration: 0.4 },
+                            scale: { duration: 0.6 },
+                            rotate: { duration: 0.6 },
+                            x: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
+                          style={{ left: 'calc(50% - 30px)', top: 'calc(50% + 10px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 4" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante5 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{
+                            opacity: 1,
+                            scale: 1,
+                            x: [0, 79, -11, 29, 40, 45, -20, 40, -60, 0, 13, -10, 34, 44, 58, -70, 30, -60, 0],
+                            y: [0, 150, 300, -160, 400, 220, 170, 90, 200, 0, 150, 300, -160, 400, 220, 170, 90, 200, 0]
+                          }}
+                          transition={{
+                            opacity: { duration: 0.3 },
+                            scale: { duration: 0.5 },
+                            x: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 88, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-36 md:h-36"
+                          style={{ left: 'calc(50% + 40px)', top: 'calc(50% - 70px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 5" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante6 && (
+                        <motion.div
+                          initial={{ scale: 0, rotate: -180 }}
+                          animate={{
+                            scale: 1,
+                            rotate: 0,
+                            x: [0, -40, 39, -30, 10, -50, 60, 0, -10, 69, -60, 11, -80, 43, 0],
+                            y: [0, -160, 200, -140, 300, -100, 400, 0, -160, 200, -140, 300, -100, 400, 0]
+                          }}
+                          transition={{
+                            scale: { duration: 0.6 },
+                            rotate: { duration: 0.6 },
+                            x: { duration: 86, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 86, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
+                          style={{ left: 'calc(50% + 20px)', top: 'calc(50% + 50px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 6" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante7 && (
+                        <motion.div
+                          initial={{ scale: 0.5, rotate: -90 }}
+                          animate={{
+                            scale: 1,
+                            rotate: 0,
+                            x: [0, 20, -22, 39, -30, 20, -25, 33, 0, 40, -33, 36, -33, 40, -10, 43, 0],
+                            y: [0, -100, 180, -160, 300, -140, 250, -120, 0, -100, 180, -160, 300, -140, 250, -120, 0]
+                          }}
+                          transition={{
+                            scale: { duration: 0.7 },
+                            rotate: { duration: 0.6 },
+                            x: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 90, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
+                          style={{ left: 'calc(50% - 40px)', top: 'calc(50% + 60px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 7" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante8 && (
+                        <motion.div
+                          initial={{ scale: 0.2, opacity: 0 }}
+                          animate={{
+                            scale: 1,
+                            opacity: 1,
+                            x: [0, 30, 11, -10, 31, -20, 44, -50, 34, 0, -40, 32, -40, 35, -50, 44, -60, 43, 0],
+                            y: [0, 180, -160, 300, -140, 250, -120, 200, -100, 0, 180, -160, 300, -140, 250, -120, 200, -100, 0]
+                          }}
+                          transition={{
+                            scale: { duration: 0.8 },
+                            opacity: { duration: 0.6 },
+                            x: { duration: 92, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" },
+                            y: { duration: 92, repeat: Infinity, ease: "easeInOut", repeatType: "mirror" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
+                          style={{ left: 'calc(50% + 40px)', top: 'calc(50% - 30px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 8" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      {mostrarEinsteinFlutuante9 && (
+                        <motion.div
+                          initial={{ scale: 0.3, rotate: 180 }}
+                          animate={{
+                            scale: 1,
+                            rotate: 0,
+                            x: [0, 51, -40, 40, -30, 52, -40, 42, 0, 44, -30, 13, -50, 23, -25, 55, 0],
+                            y: [0, -140, 300, -160, 280, -120, 240, -100, 0, -140, 300, -160, 280, -120, 240, -100, 0]
+                          }}
+                          transition={{
+                            scale: { duration: 0.7 },
+                            rotate: { duration: 0.7 },
+                            x: { duration: 94, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                            y: { duration: 94, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                          }}
+                          className="absolute pointer-events-none w-22 h-22 md:w-40 md:h-40"
+                          style={{ left: 'calc(50% + 20px)', top: 'calc(50% + 20px)' }}
+                        >
+                          <Image src="/einstein_final.png" alt="Einstein 9" width={120} height={120} className="rounded-full" />
+                        </motion.div>
+                      )}
+
+                      <AnimatePresence>
+                        {mostrarEinsteinFlutuante10 && !einstein10Explodiu && (
+                          <motion.div
+                            key="einstein10"
+                            initial={{ scale: 0, opacity: 0 }}
+                            animate={{
+                              scale: 2,
+                              opacity: 1,
+                              x: [0, -10, 65, -70, 42, -40, 27, -10, 11, 0, -60, 32, -30, 44, -40, 31, -66, 44, 0],
+                              y: [0, 133, -130, 100, -120, 140, -140, 180, -90, 0, 50, -160, 400, -120, 240, -100, 180, -90, 0]
+                            }}
+                            exit={{
+                              y: 2500,
+                              rotate: 1080,
+                              scale: 0.1,
+                              transition: { duration: 1.7, ease: "easeIn" }
+                            }}
+                            transition={{
+                              scale: { duration: 1.5 },
+                              opacity: { duration: 0.9 },
+                              x: { duration: 96, repeat: Infinity, ease: "easeInOut", repeatType: "loop" },
+                              y: { duration: 96, repeat: Infinity, ease: "easeInOut", repeatType: "loop" }
+                            }}
+                            onClick={handleClickEinstein10}
+                            className="absolute pointer-events-auto cursor-pointer w-22 h-22 md:w-45 md:h-45 sm:h-45 sm:w-45"
+                            style={{ left: 'calc(50% - 120px)', top: 'calc(50% - 90px)' }}
+                          >
+                            <Image src="/einstein_final.png"
+                              alt="Einstein 10"
+                              width={120}
+                              height={120}
+                              className="select-none rounded-full"
+                              style={{
+                                userSelect: 'none',
+                                WebkitUserSelect: 'none',
+                                pointerEvents: 'none'
+                              }}
+                            />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  <AnimatePresence>
+
+                    {mostrarBotaoFiquePorDentro && (
+                      <motion.div
+                        className="w-full sm:w-full mx-auto flex flex-col sm:flex-row justify-center gap-4 mt-1 mb-6"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1.7, ease: "easeOut", delay: 0.5 }}
+                      >
+                        <motion.button
+                          key="fique-por-dentro"
+                          className={`select-none w-full text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-gray-900 text-white transition-all duration-500 ease-in-out ${mostrarCaixaEmail ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                            }`}
+                          onClick={() => setMostrarCaixaEmail(true)}
+                          initial={{ opacity: 1, y: 0 }}
+                          animate={{ scale: [1, 1.04, 1] }}
+                          transition={{ duration: 1.7, repeat: Infinity, ease: "easeInOut" }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          FIQUE POR DENTRO!
+                        </motion.button>
+
+                        <motion.button
+                          key="colaborador"
+                          className={`w-full select-none -mt-2 sm:mt-0 text-base sm:text-sm py-4 sm:py-3 px-6 font-bold bg-white text-gray-900 transition-all duration-500 ease-in-out ${mostrarCaixaColaborador ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                            }`}
+                          onClick={() => setMostrarCaixaColaborador(true)}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.1, ease: "easeOut" }}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.95 }}
+                        >
+                          COMPARTILHE SUAS IDEIAS
+                        </motion.button>
+
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <AnimatePresence>
+                    {!modoVisualFinal && mostrarBotoes && (
+                      <motion.div
+                        key="botoes"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: balaoAtivo ? 69 : 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{
+                          y: {
+                            type: "spring",
+                            stiffness: 30,
+                            damping: 10,
+                            duration: 0.6,
+                          },
+                          opacity: { duration: 0.5, ease: "easeInOut" },
+                          layout: {
                             type: "spring",
                             stiffness: 85,
                             damping: 15,
-                            duration: 1
-                          }}
-                          onClick={embaralhar}
-                          disabled={embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || agrupando}
-                          className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
-                        >
-                          Embaralhar
-                        </motion.button>
+                            duration: 1.5,
+                          },
+                        }}
+                        className="flex flex-col items-center gap-2 mb-6 mt-2"
+                      >
 
-                        <motion.button
-                          layout
-                          transition={{ type: "spring", stiffness: 85, damping: 15, duration: 0.3 }}
-                          onClick={handleMotivacao}
-                          disabled={jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || embaralhando || agrupando}
-                          className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
-                        >
-                          Motivação
-                        </motion.button>
-                      </div>
-
-                      {/* LINHA 2: Limpar e Agrupar */}
-                      <div className="flex w-full gap-2.5 sm:gap-3.4">
-                        <motion.button
-                          layout
-                          transition={{
-                            layout: {
+                        {/* LINHA 1: Embaralhar e Motivação */}
+                        <div className="flex w-full gap-2.5 sm:gap-3.4">
+                          <motion.button
+                            layout
+                            transition={{
                               type: "spring",
                               stiffness: 85,
                               damping: 15,
                               duration: 1
-                            }
-                          }}
-                          onClick={handleLimpar}
-                          disabled={selecionadas.length === 0 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando || mostrarMensagemMotivacao}
-                          className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length > 0 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
-                        >
-                          Limpar
-                        </motion.button>
+                            }}
+                            onClick={embaralhar}
+                            disabled={embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || agrupando}
+                            className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
+                          >
+                            Embaralhar
+                          </motion.button>
 
+                          <motion.button
+                            layout
+                            transition={{ type: "spring", stiffness: 85, damping: 15, duration: 0.3 }}
+                            onClick={handleMotivacao}
+                            disabled={jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao || embaralhando || agrupando}
+                            className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border hover:scale-[1.02] border-gray-800 shadow-lg btn-press-effect ${(!jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao) ? 'hover:bg-gradient-to-br hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} sm:px-7 sm:py-3 sm:text-lg`}
+                          >
+                            Motivação
+                          </motion.button>
+                        </div>
+
+                        {/* LINHA 2: Limpar e Agrupar */}
+                        <div className="flex w-full gap-2.5 sm:gap-3.4">
+                          <motion.button
+                            layout
+                            transition={{
+                              layout: {
+                                type: "spring",
+                                stiffness: 85,
+                                damping: 15,
+                                duration: 1
+                              }
+                            }}
+                            onClick={handleLimpar}
+                            disabled={selecionadas.length === 0 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando || mostrarMensagemMotivacao}
+                            className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length > 0 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
+                          >
+                            Limpar
+                          </motion.button>
+
+                          <motion.button
+                            layout
+                            transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
+                            onClick={handleAgrupar}
+                            disabled={selecionadas.length < 2 || agrupando || embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao}
+                            className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length >= 2 && !embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
+                          >
+                            Agrupar
+                          </motion.button>
+                        </div>
+
+                        {/* LINHA 3: Verificar */}
                         <motion.button
                           layout
                           transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
-                          onClick={handleAgrupar}
-                          disabled={selecionadas.length < 2 || agrupando || embaralhando || jogoPerdido || jogoGanho || processandoErro || mostrarMensagemMotivacao}
-                          className={`w-full px-5 py-2 text-base bg-white text-gray-900 hover:scale-[1.02] border border-gray-500 shadow-lg btn-press-effect sm:px-7 sm:py-3 sm:text-lg transition-opacity duration-1550 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed ${selecionadas.length >= 2 && !embaralhando && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ? 'hover:bg-gray-100' : ''}`}
-                        >
-                          Agrupar
-                        </motion.button>
-                      </div>
-
-                      {/* LINHA 3: Verificar */}
-                      <motion.button
-                        layout
-                        transition={{ type: "spring", stiffness: 85, damping: 15, duration: 1 }}
-                        onClick={verificar}
-                        disabled={selecionadas.length !== 4 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando}
-                        className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect 
+                          onClick={verificar}
+                          disabled={selecionadas.length !== 4 || jogoPerdido || jogoGanho || processandoErro || embaralhando || agrupando}
+                          className={`w-full px-5 py-2 text-base bg-gray-900 text-gray-100 border border-gray-800 shadow-lg btn-press-effect 
     ${selecionadas.length === 4 && !jogoPerdido && !jogoGanho && !processandoErro && !mostrarMensagemMotivacao ?
-                            'hover:bg-gradient-to-br hover:scale-[1.02] hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} 
+                              'hover:bg-gradient-to-br hover:scale-[1.02] hover:from-black hover:to-gray-900' : 'opacity-50 cursor-not-allowed'} 
     sm:px-7 sm:py-3 sm:text-lg`}
-                      >
-                        Verificar
-                      </motion.button>
-                      { }
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                        >
+                          Verificar
+                        </motion.button>
+                        { }
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
-                <motion.div
-                  layout
-                  animate={{ y: balaoAtivo ? 69 : 0, opacity: 1 }}
-                  transition={{
-                    layout: {
-                      type: "spring",
-                      stiffness: 65,
-                      damping: 15,
-                      duration: 1
-                    }
-                  }}
-
-                  className="-mt-2 pt-4 border-t-3 border-gray-200"
-                >
-
-                  <h2
-                    className="relative select-none hover:scale-[1.02] text-l font-bold text-center mb-4 bg-gradient-to-r from-amber-300 via-rose-300 via-pink-400 via-purple-300 to-blue-300 bg tracking-wider text-gray-900 flex items-center justify-center gap-2 py-3 px-6 shadow-lg"
-                    onClick={() => {
-                      setClicksTituloQuadro(prev => {
-                        const novoValor = prev + 1;
-                        if (novoValor >= 10) {
-                          console.log('CHEAT: resetando o jogo via clique no título do quadro!');
-                          localStorage.removeItem('einsteins_fimDeJogo');
-                          window.location.reload();
-                          return 0; // reseta o contador
-                        }
-                        return novoValor;
-                      });
+                  <motion.div
+                    layout
+                    animate={{ y: balaoAtivo ? 69 : 0, opacity: 1 }}
+                    transition={{
+                      layout: {
+                        type: "spring",
+                        stiffness: 65,
+                        damping: 15,
+                        duration: 1
+                      }
                     }}
+
+                    className="-mt-2 pt-4 border-t-3 border-gray-200"
                   >
-                    <span className="text-green-600"></span>
-                    <span className="mx-2">QUADRO DE VENCEDORES</span>
-                    <span className="text-green-600 scale-x-[-1]"></span>
-                  </h2>
+
+                    <h2
+                      className="relative select-none hover:scale-[1.02] text-l font-bold text-center mb-4 bg-gradient-to-r from-amber-300 via-rose-300 via-pink-400 via-purple-300 to-blue-300 bg tracking-wider text-gray-900 flex items-center justify-center gap-2 py-3 px-6 shadow-lg"
+                      onClick={() => {
+                        setClicksTituloQuadro(prev => {
+                          const novoValor = prev + 1;
+                          if (novoValor >= 10) {
+                            console.log('CHEAT: resetando o jogo via clique no título do quadro!');
+                            localStorage.removeItem('einsteins_fimDeJogo');
+                            window.location.reload();
+                            return 0; // reseta o contador
+                          }
+                          return novoValor;
+                        });
+                      }}
+                    >
+                      <span className="text-green-600"></span>
+                      <span className="mx-2">QUADRO DE VENCEDORES</span>
+                      <span className="text-green-600 scale-x-[-1]"></span>
+                    </h2>
 
 
-                  {/* ========== CÓDIGO DAS ESTATÍSTICAS ========== */}
-                  {estatisticas.totalJogos > 0 && !mostrarMenuInicial && (() => {
-                    const distribuicao = calcularDistribuicaoRanking();
+                    {/* ========== CÓDIGO DAS ESTATÍSTICAS ========== */}
+                    {estatisticas.totalJogos > 0 && !mostrarMenuInicial && (() => {
+                      const distribuicao = calcularDistribuicaoRanking();
 
-                    const gradientes:string[] = [];
-                    let acumulado = 0;
+                      const gradientes: string[] = [];
+                      let acumulado = 0;
 
-                    distribuicao.forEach(({ cor, largura }) => {
-                      const inicio = acumulado;
-                      const fim = acumulado + parseFloat(largura);
+                      distribuicao.forEach(({ cor, largura }) => {
+                        const inicio = acumulado;
+                        const fim = acumulado + parseFloat(largura);
 
-                      // Cria uma margem de transição suave entre cores
-                      const suavizacao = 1; // em %
+                        // Cria uma margem de transição suave entre cores
+                        const suavizacao = 1; // em %
 
-                      gradientes.push(
-                        `${cor} ${Math.max(inicio - suavizacao, 0)}%`,
-                        `${cor} ${fim + suavizacao}%`
-                      );
+                        gradientes.push(
+                          `${cor} ${Math.max(inicio - suavizacao, 0)}%`,
+                          `${cor} ${fim + suavizacao}%`
+                        );
 
-                      acumulado = fim;
-                    });
+                        acumulado = fim;
+                      });
 
-                    const estiloBarra: React.CSSProperties = {
-                      backgroundImage: `linear-gradient(to right, ${gradientes.join(', ')})`,
-                      height: '22px',
-                      borderRadius: '2px',
-                      opacity: 0.8,
-                      width: '100%',
-                      boxShadow: '0 9px 8px rgba(36, 15, 15, 0.15)',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    };
+                      const estiloBarra: React.CSSProperties = {
+                        backgroundImage: `linear-gradient(to right, ${gradientes.join(', ')})`,
+                        height: '22px',
+                        borderRadius: '2px',
+                        opacity: 0.8,
+                        width: '100%',
+                        boxShadow: '0 9px 8px rgba(36, 15, 15, 0.15)',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      };
 
-                    return (
-                      <div className="w-full max-w-screen-lg mx-auto px-3 -mt-2 mb-2">
-                        <p className="text-sm text-center font-extrabold mt-1 mb-2">
-                          <span className=" select-none font-bold bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold">
-                            Percentual de Vitórias: {taxaSucesso}%
-                          </span>
-                        </p>
+                      return (
+                        <div className="w-full max-w-screen-lg mx-auto px-3 -mt-2 mb-2">
+                          <p className="text-sm text-center font-extrabold mt-1 mb-2">
+                            <span className=" select-none font-bold bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold">
+                              Percentual de Vitórias: {taxaSucesso}%
+                            </span>
+                          </p>
 
-                        {/* Barra de ranking no topo */}
-                        <div style={estiloBarra} title="Distribuição dos rankings e derrotas" />
+                          {/* Barra de ranking no topo */}
+                          <div style={estiloBarra} title="Distribuição dos rankings e derrotas" />
 
-                        <div className="select-none flex flex-wrap gap-3 sm:gap-9 items-center justify-center text-sm mt-3">
-                          {[
-                            { cor: 'bg-amber-300', opacity: '80%', nome: 'Genial' },
-                            { cor: 'bg-sky-300', opacity: '80%', nome: 'Admirável' },
-                            { cor: 'bg-rose-400', opacity: '80%', nome: 'Perspicaz' },
-                            { cor: 'bg-purple-400', opacity: '80%', nome: 'Inabalável' },
-                          ].map((item, i) => (
-                            <div key={i} className="flex items-center space-x-1">
-                              <div className={`w-4 h-4 rounded-sm ${item.cor}`} />
-                              <span className="text-gray-700 font-medium">{item.nome}</span>
-                            </div>
-                          ))}
+                          <div className="select-none flex flex-wrap gap-3 sm:gap-9 items-center justify-center text-sm mt-3">
+                            {[
+                              { cor: 'bg-amber-300', opacity: '80%', nome: 'Genial' },
+                              { cor: 'bg-sky-300', opacity: '80%', nome: 'Admirável' },
+                              { cor: 'bg-rose-400', opacity: '80%', nome: 'Perspicaz' },
+                              { cor: 'bg-purple-400', opacity: '80%', nome: 'Inabalável' },
+                            ].map((item, i) => (
+                              <div key={i} className="flex items-center space-x-1">
+                                <div className={`w-4 h-4 rounded-sm ${item.cor}`} />
+                                <span className="text-gray-700 font-medium">{item.nome}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })()}
+                      );
+                    })()}
 
-                  {vencedores.length > 0 ? (
-                    <ul className=" select-none sm:z-40 relative  bg-transparent sm:bg-transparent backdrop-blur-sm w-90 -mx-2.5 sm:w-137 space-y-2 max-h-70 overflow-y-auto p-2 shadow-xl border border-gray-200/50 ring-1 ring-gray-100/50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                      {vencedores.slice().reverse().map((vencedor: any, index) => {
+                    {vencedores.length > 0 ? (
+                      <ul className="select-none sm:z-40 relative bg-transparent sm:bg-transparent backdrop-blur-sm w-90 -mx-2.5 sm:w-137 space-y-2 max-h-70 overflow-y-auto p-2 shadow-xl border border-gray-200/50 ring-1 ring-gray-100/50 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 quadro-vencedores-ajustado">
+                        {vencedores.slice().reverse().map((vencedor: any, index) => {
 
-                        const ranking = calcularRanking(vencedor.erros || 0);
-                        return (
-                          <li key={index} className="z-30 bg-transparent shadow-sm animate-fade-in border border-gray-300 overflow-visible hover:shadow-lg hover:scale-[1.01] hover:bg-gray-50 transition-all duration-300 ease-in-out ">
-                            <div className="flex items-center bg-transparent p-2">
-                              <div className={`w-2 h-5 rounded-r-sm ${ranking.corBarra} mr-3 relative`}>
+                          const ranking = calcularRanking(vencedor.erros || 0);
+                          return (
+                            <li key={index} className="z-30 bg-transparent shadow-sm animate-fade-in border border-gray-300 overflow-visible hover:shadow-lg hover:scale-[1.01] hover:bg-gray-50 transition-all duration-300 ease-in-out ">
+                              <div className="flex items-center bg-transparent p-2">
+                                <div className={`w-2 h-5 rounded-r-sm ${ranking.corBarra} mr-3 relative`}>
 
-                                {/* Ranking dentro da barra */}
-                                <div className=" absolute inset-0 flex items-center justify-center">
-                                  <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
-                                    {ranking.nivel}
+                                  {/* Ranking dentro da barra */}
+                                  <div className=" absolute inset-0 flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold transform -rotate-90 whitespace-nowrap">
+                                      {ranking.nivel}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className=" flex justify-between items-center flex-1">
+                                  <span className="font-semibold text-sm text-gray-800" style={{ letterSpacing: '0.06em' }}>
+                                    {vencedor.nome}
                                   </span>
+                                  <span className=" text-sm text-gray-700">{vencedor.data}</span>
                                 </div>
                               </div>
-                              <div className=" flex justify-between items-center flex-1">
-                                <span className="font-semibold text-sm text-gray-800" style={{ letterSpacing: '0.06em' }}>
-                                  {vencedor.nome}
-                                </span>
-                                <span className=" text-sm text-gray-700">{vencedor.data}</span>
-                              </div>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="text-center text-gray-500 italic mt-4">Ninguém venceu ainda. Mostre o quanto você é capaz!</p>
-                  )}
-                </motion.div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-center text-gray-500 italic mt-4">Ninguém venceu ainda. Mostre o quanto você é capaz!</p>
+                    )}
+                  </motion.div>
 
-              </main>
+                </main>
 
-            )}
+              )}
 
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* =================================================================== */}
-      <AnimatePresence>
-        {mostrarInputNome && (
-          <motion.div
-            className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-black/75 p-4"
-
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.div
-              initial={{
-                scale: 0.1,
-                boxShadow: '0 0 0 rgba(255,255,255,0)',
-                rotate: 0,
-                x: 0,
-                y: 0
-
-              }}
-              animate={{
-                scale: 1,
-                boxShadow: '0 0 50px rgba(255,255,255,0.3)',
-                rotate: 0,
-                x: 0,
-                y: 0
-              }}
-              style={{
-                border: '5px solid transparent',
-                background: 'linear-gradient(white, white) padding-box, linear-gradient(90deg, #7dd3fc, #fcd34d, #fda4af, #c4b5fd) border-box',
-                willChange: 'transform, opacity',
-                backfaceVisibility: 'hidden',
-                transformStyle: 'preserve-3d'
-              }}
-              exit={{
-                scale: 0.2,
-                rotate: 1880, // 4 voltas
-                opacity: 0,
-                borderRadius: '50%',
-                boxShadow: '0 0 0 100px rgba(113, 59, 163, 0.5)',
-                filter: 'hue-rotate(360deg) brightness(5)',
-                overflow: 'hidden'
-              }}
-              transition={{
-                duration: 1.8,
-                ease: [0.4, 0, 0.2, 1]
-              }}
-              className="w-full max-w-md overflow: 'hidden' "
-            >
-              {(() => {
-                const errosRealizados = 4 - vidas;
-                const ranking = calcularRanking(errosRealizados);
-
-                return (
-                  // Adicionado "relative" para posicionar o botão 'X'
-                  <div className={`relative bg-white p-6 sm:p-8 shadow-xl text-center border-4 ${ranking.borderCor} ${ranking.bgCor}`}>
-
-                    {/* NOVO: Botão de fechar (X) */}
-                    <button
-                      onClick={handleFecharInputNome}
-                      className="absolute top-1 right-1 bg-gray-400 text-white hover:bg-gray-700 hover:scale-107 transition-all duration-200 z-10 shadow-lg hover:shadow-xl"
-                      aria-label="Fechar"
-                    >
-                      <svg
-                        className="w-4 h-4 -m-6"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={5}
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                    {/* Título você venceu */}
-                    <motion.h2
-                      className="select-none text-3xl sm:text-4xl font-extrabold mb-3 text-gray-800"
-                      animate={{ scale: [1, 1.08, 1] }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    >
-                      VOCÊ VENCEU!
-                    </motion.h2>
-
-                    {/* Ranking */}
-                    <motion.div
-                      className="mb-4"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
-
-                    >
-                      <h3 className={`select-none text-[23px] sm:text-2xl font-bold ${ranking.cor} mb-1`}>
-                        {ranking.titulo}
-                      </h3>
-                      <p className={`select-none text-sm ${ranking.cor} font-semibold mb-3`}>
-                        {ranking.subtitulo}
-                      </p>
-                      <p className=" select-none text-gray-700 text-[17px] sm:text-[10x] leading-relaxed mb-9 text-justify">
-                        {ranking.descricao}
-                      </p>
-                    </motion.div>
-                    {/* Formulário */}
-                    <motion.form
-                      onSubmit={handleSalvarVencedor}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.6 }}
-                    >
-                      <p className="mb-4 text-[20px] select-none text-transparent sm:text-[22px] bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold">
-                        QUADRO DE VENCEDORES
-                      </p>
-
-                      <input
-                        type="text"
-                        value={nomeAtual}
-                        onChange={(e) => setNomeAtual(e.target.value)}
-                        className="w-full border-2 border-gray-400 p-3 mb-4 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 transition-all duration-200"
-                        style={{ fontSize: '16px', }}
-                        placeholder="Deixe sua marca"
-                        maxLength={25}
-                        autoComplete="off"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck="false"
-                      />
-                      <button
-                        type="submit"
-                        className="w-full bg-gray-900 text-white px-6 py-3 font-bold hover:bg-gray-800 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled={!nomeAtual.trim()}
-                      >
-                        Entrar para a história
-                      </button>
-                    </motion.form>
-                  </div>
-                );
-              })()}
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
 
-      {/* ADICIONE O CÓDIGO ABAIXO AQUI */}
-      <AnimatePresence>
-        {mostrarCaixaEmail && (
-          <CaixaNotificacaoEmail onClose={handleFecharCaixaEmail} />
-        )}
-      </AnimatePresence>
+        {/* =================================================================== */}
+        <AnimatePresence>
+          {mostrarInputNome && (
+            <motion.div
+              className="fixed inset-0 flex flex-col items-center justify-center z-50 bg-black/75 p-4"
 
-      <AnimatePresence>
-        {mostrarCaixaColaborador && (
-          <CaixaColaborador onClose={() => setMostrarCaixaColaborador(false)} />
-        )}
-      </AnimatePresence>
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.div
+                initial={{
+                  scale: 0.1,
+                  boxShadow: '0 0 0 rgba(255,255,255,0)',
+                  rotate: 0,
+                  x: 0,
+                  y: 0
 
-    </>
-  )
-}
+                }}
+                animate={{
+                  scale: 1,
+                  boxShadow: '0 0 50px rgba(255,255,255,0.3)',
+                  rotate: 0,
+                  x: 0,
+                  y: 0
+                }}
+                style={{
+                  border: '5px solid transparent',
+                  background: 'linear-gradient(white, white) padding-box, linear-gradient(90deg, #7dd3fc, #fcd34d, #fda4af, #c4b5fd) border-box',
+                  willChange: 'transform, opacity',
+                  backfaceVisibility: 'hidden',
+                  transformStyle: 'preserve-3d'
+                }}
+                exit={{
+                  scale: 0.2,
+                  rotate: 1880, // 4 voltas
+                  opacity: 0,
+                  borderRadius: '50%',
+                  boxShadow: '0 0 0 100px rgba(113, 59, 163, 0.5)',
+                  filter: 'hue-rotate(360deg) brightness(5)',
+                  overflow: 'hidden'
+                }}
+                transition={{
+                  duration: 1.8,
+                  ease: [0.4, 0, 0.2, 1]
+                }}
+                className="w-full max-w-md overflow: 'hidden' "
+              >
+                {(() => {
+                  const errosRealizados = 4 - vidas;
+                  const ranking = calcularRanking(errosRealizados);
+
+                  return (
+                    // Adicionado "relative" para posicionar o botão 'X'
+                    <div className={`relative bg-white p-6 sm:p-8 shadow-xl text-center border-4 ${ranking.borderCor} ${ranking.bgCor}`}>
+
+                      {/* NOVO: Botão de fechar (X) */}
+                      <button
+                        onClick={handleFecharInputNome}
+                        className="absolute top-1 right-1 bg-gray-400 text-white hover:bg-gray-700 hover:scale-107 transition-all duration-200 z-10 shadow-lg hover:shadow-xl"
+                        aria-label="Fechar"
+                      >
+                        <svg
+                          className="w-4 h-4 -m-6"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={5}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                      {/* Título você venceu */}
+                      <motion.h2
+                        className="select-none text-3xl sm:text-4xl font-extrabold mb-3 text-gray-800"
+                        animate={{ scale: [1, 1.08, 1] }}
+                        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                      >
+                        VOCÊ VENCEU!
+                      </motion.h2>
+
+                      {/* Ranking */}
+                      <motion.div
+                        className="mb-4"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.4 }}
+
+                      >
+                        <h3 className={`select-none text-[23px] sm:text-2xl font-bold ${ranking.cor} mb-1`}>
+                          {ranking.titulo}
+                        </h3>
+                        <p className={`select-none text-sm ${ranking.cor} font-semibold mb-3`}>
+                          {ranking.subtitulo}
+                        </p>
+                        <p className=" select-none text-gray-700 text-[17px] sm:text-[10x] leading-relaxed mb-9 text-justify">
+                          {ranking.descricao}
+                        </p>
+                      </motion.div>
+                      {/* Formulário */}
+                      <motion.form
+                        onSubmit={handleSalvarVencedor}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.6 }}
+                      >
+                        <p className="mb-4 text-[20px] select-none text-transparent sm:text-[22px] bg-gradient-to-r from-amber-400 via-rose-400 via-pink-500 via-purple-400 to-blue-400 bg-clip-text text-transparent font-extrabold">
+                          QUADRO DE VENCEDORES
+                        </p>
+
+                        <input
+                          type="text"
+                          value={nomeAtual}
+                          onChange={(e) => setNomeAtual(e.target.value)}
+                          className="w-full border-2 border-gray-400 p-3 mb-4 focus:border-gray-600 focus:ring-2 focus:ring-gray-200 transition-all duration-200"
+                          style={{ fontSize: '16px', }}
+                          placeholder="Deixe sua marca"
+                          maxLength={25}
+                          autoComplete="off"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          spellCheck="false"
+                        />
+                        <button
+                          type="submit"
+                          className="w-full bg-gray-900 text-white px-6 py-3 font-bold hover:bg-gray-800 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!nomeAtual.trim()}
+                        >
+                          Entrar para a história
+                        </button>
+                      </motion.form>
+                    </div>
+                  );
+                })()}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ADICIONE O CÓDIGO ABAIXO AQUI */}
+        <AnimatePresence>
+          {mostrarCaixaEmail && (
+            <CaixaNotificacaoEmail onClose={handleFecharCaixaEmail} />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {mostrarCaixaColaborador && (
+            <CaixaColaborador onClose={() => setMostrarCaixaColaborador(false)} />
+          )}
+        </AnimatePresence>
+
+      </>
+    )
+  }
