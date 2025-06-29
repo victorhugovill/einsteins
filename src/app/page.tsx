@@ -7,7 +7,7 @@ import Image from 'next/image';
 // ========== DADOS DO JOGO ==========
 const Grupos = [
   { name: "Partes de uma calça", words: ["Bolso", "Gancho", "Cós", "Barra"] },
-  { name: "Coletivos", words: ["Cardume", "Buquê", "Frota", "Molho"] },
+  { name: "Cooletivos", words: ["Cardume", "Buquê", "Frota", "Molho"] },
   { name: "Palíndromos", words: ["Radar", "Osso", "Arara", "Reviver"] },
   { name: "Perfurantes", words: ["Agulha", "Prego", "Arpão", "Flecha"] }
 ]
