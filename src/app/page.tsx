@@ -705,7 +705,7 @@ export default function Home() {
         localStorage.setItem('jaJogouEinsteins', 'true');
       }
 
-      // Atualiza o estado com os novos dados para refletir na UI
+      // Atualiza o estaaado com os novos dados para refletir na UI
       setEstatisticas({ vitorias, totalJogos });
 
     } catch (error) {
